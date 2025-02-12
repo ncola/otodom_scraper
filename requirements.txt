@@ -1,0 +1,6 @@
+requests==2.32.3 #do wysyłania zapytań HTTP ( do pobierania stron)
+beautifulsoup4==4.13.3 #do parsowania HTML i ekstrakcji danych
+pandas==2.2.3
+openpyxl==3.1.5 #do odczytu i zapisu plików Excel 
+json==2.0.9  
+soupsieve==2.6 #cześci BeautifulSoup
