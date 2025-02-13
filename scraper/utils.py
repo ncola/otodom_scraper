@@ -121,7 +121,8 @@ def download_data_from_listing_page(html_response):
         rent = target.get("Rent", "Brak")
         windows_type = str(target.get("Windows_type", "Brak"))
         security_types = target.get("Security_types", "Brak")
-        security_types = ', '.join(data for data in security_types)
+        if isinstance(security_types, list):
+            security_types = ', '.join(data for data in security_types)
         rooms_num = str(target.get("Rooms_num", "Brak"))
         
 
@@ -133,7 +134,10 @@ def download_data_from_listing_page(html_response):
             street = location_data.get("street", {}).get("name", "Brak") if location_data.get("street") else "Brak"
             subdistrict = location_data.get("subdistrict", "Brak") if location_data.get("subdistrict") else "Brak"
             district = location_data.get("district", "Brak") if location_data.get("district") else "Brak"
-            district = ", ".join((str(data) for data in list(district.values())[:-1])) #keys: id, code, name
+            if isinstance(district, dict):
+                district = ", ".join((str(data) for data in list(district.values())[:-1])) #keys: id, code, name
+            else:
+                district = district
         else:
             street = "Brak"
             subdistrict = "Brak"
@@ -163,7 +167,7 @@ def download_data_from_listing_page(html_response):
             agency_name = "Brak"
 
         
-        """print("Dane podstawowe oferty:")
+        print("Dane podstawowe oferty:")
         print(f"ID oferty: {id}")
         print(f"Rynek: {market}")
         print(f"Typ ogłoszeniodawcy: {advertiser_type}")
@@ -218,7 +222,7 @@ def download_data_from_listing_page(html_response):
         print(f"owner_id: {owner_id}")
         print(f"owner_name: {owner_name}")
         print(f"agency_id: {agency_id}")
-        print(f"agency_name: {agency_name}")"""
+        print(f"agency_name: {agency_name}")
 
         # podstawowe informacje o ofercie
         data = {}
