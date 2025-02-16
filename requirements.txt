@@ -1,6 +1,17 @@
-requests==2.32.3 #do wysyłania zapytań HTTP ( do pobierania stron)
-beautifulsoup4==4.13.3 #do parsowania HTML i ekstrakcji danych
+beautifulsoup4==4.13.3
+certifi==2025.1.31
+charset-normalizer==3.4.1
+et_xmlfile==2.0.0
+idna==3.10
+numpy==2.2.3
+opencv-python==4.11.0.86
+openpyxl==3.1.5
 pandas==2.2.3
-openpyxl==3.1.5 #do odczytu i zapisu plików Excel 
-json==2.0.9  
-soupsieve==2.6 #cześci BeautifulSoup
+python-dateutil==2.9.0.post0
+pytz==2025.1
+requests==2.32.3
+six==1.17.0
+soupsieve==2.6
+typing_extensions==4.12.2
+tzdata==2025.1
+urllib3==2.3.0

@@ -1,8 +1,7 @@
 import pandas as pd
-import requests
+import requests, cv2, json
 from bs4 import BeautifulSoup
-import json
-
+import numpy as np
 
 def fetch_page(url:str):
     headers = {
@@ -71,10 +70,12 @@ def download_data_from_listing_page(html_response):
         offer_data = json_data.get("props", {}).get("pageProps", {}).get("ad", {})
 
         # Debug: wydrukowanie tylko tej części JSON, zaczynając od ...
-        #print("Struktura JSON (od ...):", json.dumps(offer_data, indent=7)[:420000])
+        print("Struktura JSON (od props/pageProps/ad):", json.dumps(offer_data, indent=7)[:420000])
         print("\n")
 
         id = offer_data.get("id", "Brak")
+        title = offer_data.get("title", "Brak")
+        title = BeautifulSoup(title, "html.parser").get_text()
         market = offer_data.get("market", "Brak rynku")
         advertiser_type = offer_data.get("advertiserType", "Brak typu ogłoszeniodawcy")
         advert_type = offer_data.get("advertType", "Brak typu ogłoszenia")
@@ -104,6 +105,7 @@ def download_data_from_listing_page(html_response):
             else:
                 globals()[category_name_variable]  = "Brak"
 
+        features_without_category = offer_data.get("featuresWithoutCategory", "Brak")
 
         target = offer_data.get("target", {})
         area = target.get("Area", "Brak")
@@ -127,7 +129,7 @@ def download_data_from_listing_page(html_response):
         
 
         breadcrumbs = offer_data.get("breadcrumbs", [])
-        locations = " - ".join(breadcrumb.get("locativ", "") for breadcrumb in breadcrumbs)
+        locations = " - ".join(breadcrumb.get("locative", "") for breadcrumb in breadcrumbs)
 
         location_data = offer_data.get("location", {}).get("address", {})
         if location_data:
@@ -135,7 +137,7 @@ def download_data_from_listing_page(html_response):
             subdistrict = location_data.get("subdistrict", "Brak") if location_data.get("subdistrict") else "Brak"
             district = location_data.get("district", "Brak") if location_data.get("district") else "Brak"
             if isinstance(district, dict):
-                district = ", ".join((str(data) for data in list(district.values())[:-1])) #keys: id, code, name
+                district = ", ".join((str(data) for data in list(district.values())[1:-1])) #keys: id, code, name
             else:
                 district = district
         else:
@@ -147,13 +149,24 @@ def download_data_from_listing_page(html_response):
         for data in reverseGeocoding_locations:
             dzielnica = data.get("name") if data.get("locationLevel") == "district" else "Brak"
 
+        # Zdjęcia
+        images = []
+        images_html = offer_data.get("images", "Brak")
+        for element in images_html:
+            image_link = element.get("medium", "Brak")
+            image_response = fetch_page(image_link)
+            arr = np.asarray(bytearray(image_response.content), dtype=np.uint8)
+            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)  
+            images.append(img)
 
+        # Linki
         links = offer_data.get("links", {})
         local_plan_url = links.get("localPlanUrl", "Brak linku")
         video_url = links.get("videoUrl", "Brak linku")
         view3d_url = links.get("view3dUrl", "Brak linku")
         walkaround_url = links.get("walkaroundUrl", "Brak linku")
         
+        # Sprzedający
         seller = offer_data.get("owner", {})
         owner_id = seller.get("id", "Brak")
         owner_name = seller.get("name", "Brak")
@@ -167,7 +180,7 @@ def download_data_from_listing_page(html_response):
             agency_name = "Brak"
 
         
-        print("Dane podstawowe oferty:")
+        """print("Dane podstawowe oferty:")
         print(f"ID oferty: {id}")
         print(f"Rynek: {market}")
         print(f"Typ ogłoszeniodawcy: {advertiser_type}")
@@ -222,11 +235,12 @@ def download_data_from_listing_page(html_response):
         print(f"owner_id: {owner_id}")
         print(f"owner_name: {owner_name}")
         print(f"agency_id: {agency_id}")
-        print(f"agency_name: {agency_name}")
+        print(f"agency_name: {agency_name}")"""
 
         # podstawowe informacje o ofercie
         data = {}
         data["id"] = id
+        data["title"] = title
         data["market"] = market
         data["advertiser_type"] = advertiser_type
         data["advert_type"] = advert_type
@@ -253,6 +267,7 @@ def download_data_from_listing_page(html_response):
         data["cechy_zabezpieczenia"] = cechy_zabezpieczenia
         data["cechy_wyposazenie"] = cechy_wyposazenie
         data["cechy_informacje_dodatkowe"] = cechy_informacje_dodatkowe
+        data["features_without_category"] = features_without_category
 
         # lokalizacja
         data["locations"] = locations
@@ -276,6 +291,9 @@ def download_data_from_listing_page(html_response):
         data["view3d_url"] = view3d_url
         data["walkaround_url"] = walkaround_url
 
+        # zdjęcia
+        data["images"] = images
+        
         # sprzedajacy
         data["owner_id"] = owner_id
         data["owner_name"] = owner_name
