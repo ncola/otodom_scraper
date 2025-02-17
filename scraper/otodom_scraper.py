@@ -34,4 +34,4 @@ def scrape_all_page(url=url_main):
 
 
 
-scrape_all_page()
+#scrape_all_page()

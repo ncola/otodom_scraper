@@ -3,7 +3,19 @@ import requests, cv2, json
 from bs4 import BeautifulSoup
 import numpy as np
 
-def fetch_page(url:str):
+def fetch_page(url: str) -> requests.Response:
+    """
+    Fetches the content of a webpage in Polish language.
+
+    Args:
+    url (str): The URL of the page to fetch.
+
+    Returns:
+    requests.Response: The HTTP response object containing the content of the page.
+
+    If the request is successful (status code 200), it returns the response object.
+    Otherwise, it prints an error message with the status code and returns None.
+    """
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
         "Cache-Control": "no-cache",
@@ -21,7 +33,20 @@ def fetch_page(url:str):
         return None
 
 
-def download_data_from_searching_page(html_response):
+def download_data_from_searching_page(html_response: requests.Response) -> list:
+    """
+    Extracts listing information from the HTML content of a search results page (for otodom.com).
+
+    Args:
+    html_response (requests.Response): The response object containing the HTML content of the page.
+
+    Returns:
+    list: A list of dictionaries, each containing details about an offer such as title, price, link, 
+          date of creation, and the first creation date.
+
+    Raises:
+    Exception: If the HTML response is None or if there is an issue parsing the data from the page.
+    """
     if html_response is None:
         raise Exception(f"Wystąpił błąd w pobraniu danych ze strony")
     
@@ -57,7 +82,22 @@ def download_data_from_searching_page(html_response):
         raise Exception(f"Błąd w pobraniu danych ze strony, script_tag: {script_tag}")
 
 
-def download_data_from_listing_page(html_response):
+def download_data_from_listing_page(html_response:requests.Response) -> dict:
+    """
+    Parses the HTML response, extracts the property listing data embedded in a JSON object 
+    within a <script> tag, and returns it as a dictionary.
+
+    Parameters:
+        html_response (requests.Response): The HTTP response containing the HTML of the page 
+        to be parsed.
+
+    Returns:
+        dict: A dictionary containing the extracted property listing data, such as title, price, 
+        location, features, images, etc.
+
+    Raises:
+        Exception: If the HTML response does not contain the necessary data or is invalid.
+    """
     if html_response is None:
         raise Exception(f"Wystąpił błąd w pobraniu danych ze strony")
     
@@ -70,62 +110,58 @@ def download_data_from_listing_page(html_response):
         offer_data = json_data.get("props", {}).get("pageProps", {}).get("ad", {})
 
         # Debug: wydrukowanie tylko tej części JSON, zaczynając od ...
-        print("Struktura JSON (od props/pageProps/ad):", json.dumps(offer_data, indent=7)[:420000])
-        print("\n")
+        #print("Struktura JSON (od props/pageProps/ad):", json.dumps(offer_data, indent=7)[:420000])
+        #print("\n")
 
-        id = offer_data.get("id", "Brak")
-        title = offer_data.get("title", "Brak")
-        title = BeautifulSoup(title, "html.parser").get_text()
-        market = offer_data.get("market", "Brak rynku")
-        advertiser_type = offer_data.get("advertiserType", "Brak typu ogłoszeniodawcy")
-        advert_type = offer_data.get("advertType", "Brak typu ogłoszenia")
-        date_created = offer_data.get("createdAt", "Brak daty utworzenia")
-        date_modified = offer_data.get("modifiedAt", "Brak daty modyfikacji")
-        description = offer_data.get("description", "Brak opisu")
+        listing_id = offer_data.get("id", "N/A")
+        listing_title = offer_data.get("title", "N/A")
+        listing_title = BeautifulSoup(listing_title, "html.parser").get_text()
+        market_type = str(offer_data.get("market", "N/A")).lower()
+        advertisement_type = str(offer_data.get("advertType", "N/A")).lower()
+        creation_date = offer_data.get("createdAt", "N/A")
+        last_modified_date = offer_data.get("modifiedAt", "N/A")
+        description = offer_data.get("description", "N/A")
         description_text = BeautifulSoup(description, "html.parser").get_text()
-        exclusive_offer = offer_data.get("exclusiveOffer", "Brak")
-        features = offer_data.get("features", "Brak cech")
-        features_str = ', '.join(features) if isinstance(features, list) else str(features)
-        creation_source = offer_data.get("creationSource", "Brak")
-        pushed_ap_at = offer_data.get("pushedUpAt", "Brak")
-        heating = offer_data.get("property", {}).get("buildingProperties", {}).get("heating", "Brak")
+        is_exclusive_offer = offer_data.get("exclusiveOffer", "N/A") # True/False
+        creation_source = str(offer_data.get("creationSource", "N/A"))
+        promoted_at = offer_data.get("pushedUpAt", "N/A")
+        heating_type = str(offer_data.get("property", {}).get("buildingProperties", {}).get("heating", "N/A")).lower()
       
         # cechy w podziale na kategorie
         features_by_category = offer_data.get("featuresByCategory", [])
 
-        features_by_category = offer_data.get("featuresByCategory", [])
         categories_names_HTML = ['Media', 'Zabezpieczenia', 'Wyposażenie', 'Informacje dodatkowe']
-        categories_names_variables = ['cechy_media', 'cechy_zabezpieczenia', 'cechy_wyposazenie', 'cechy_informacje_dodatkowe']
+        categories_names_variables = ['feautures_media', 'features_security', 'features_equipment', 'features_additional_information']
 
         for category_name, category_name_variable in zip(categories_names_HTML, categories_names_variables):
             matching_category = next((category for category in features_by_category if category.get('label') == category_name), None)
             if matching_category:
                 values = matching_category.get("values", [])
-                globals()[category_name_variable]  = ', '.join(values) if values else "Brak"
+                globals()[category_name_variable]  = ', '.join(values) if values else "N/A"
             else:
-                globals()[category_name_variable]  = "Brak"
+                globals()[category_name_variable]  = "N/A"
 
-        features_without_category = offer_data.get("featuresWithoutCategory", "Brak")
+        features_without_category = offer_data.get("featuresWithoutCategory", "N/A")
 
         target = offer_data.get("target", {})
-        area = target.get("Area", "Brak")
-        build_year = target.get("Build_year", "Brak")
-        building_floors_num = target.get("Building_floors_num", "Brak")
-        building_material = str(target.get("Building_material", "Brak"))
-        building_ownership = str(target.get("Building_ownership", "Brak"))
-        building_type = str(target.get("Building_type", "Brak"))
-        city = target.get("City", "Brak")
-        construction_status = str(target.get("Construction_status", "Brak"))
-        floor_no = str(target.get("Floor_no", "Brak"))
-        price = target.get("Price", "Brak")
-        price_per_m = target.get("Price_per_m", "Brak")
-        properType = target.get("ProperType", "Brak")
-        rent = target.get("Rent", "Brak")
-        windows_type = str(target.get("Windows_type", "Brak"))
-        security_types = target.get("Security_types", "Brak")
+        area = target.get("Area", "N/A")
+        build_year = target.get("Build_year", "N/A")
+        building_floors_count = target.get("Building_floors_num", "N/A")
+        building_material = str(target.get("Building_material", "N/A"))
+        building_ownership = str(target.get("Building_ownership", "N/A")) # ownership (Własność); cooperative_ownership (Spółdzielcze własnościowe prawo do lokalu); land_ownership (Własność gruntu); state_ownership (Własność państwowa); municipal_ownership (Własność komunalna)
+        building_type = str(target.get("Building_type", "N/A"))
+        city = target.get("City", "N/A")
+        construction_status = str(target.get("Construction_status", "N/A")) #under_construction; completed; planned; ready_for_occupancy
+        floor_num = str(target.get("Floor_no", "N/A"))
+        price = int(target.get("Price", "N/A"))
+        price_per_m = float(target.get("Price_per_m", "N/A"))
+        proper_type = target.get("ProperType", "N/A") #Mieszkanie; Dom; Działka; Komercyjna; Inny
+        rent = target.get("Rent", "N/A") #czasem ludzie wpisują '0' a czasem jest puste pole
+        windows_type = str(target.get("Windows_type", "N/A"))
+        security_types = str(target.get("Security_types", "N/A"))
         if isinstance(security_types, list):
             security_types = ', '.join(data for data in security_types)
-        rooms_num = str(target.get("Rooms_num", "Brak"))
+        rooms_num = str(target.get("Rooms_num", "N/A"))
         
 
         breadcrumbs = offer_data.get("breadcrumbs", [])
@@ -133,140 +169,80 @@ def download_data_from_listing_page(html_response):
 
         location_data = offer_data.get("location", {}).get("address", {})
         if location_data:
-            street = location_data.get("street", {}).get("name", "Brak") if location_data.get("street") else "Brak"
-            subdistrict = location_data.get("subdistrict", "Brak") if location_data.get("subdistrict") else "Brak"
-            district = location_data.get("district", "Brak") if location_data.get("district") else "Brak"
+            street = location_data.get("street", {}).get("name", "N/A") if location_data.get("street") else "N/A"
+            subdistrict = location_data.get("subdistrict", "N/A") if location_data.get("subdistrict") else "N/A"
+            district = location_data.get("district", "N/A") if location_data.get("district") else "N/A"
             if isinstance(district, dict):
                 district = ", ".join((str(data) for data in list(district.values())[1:-1])) #keys: id, code, name
             else:
                 district = district
         else:
-            street = "Brak"
-            subdistrict = "Brak"
-            district = "Brak"
+            street = "N/A"
+            subdistrict = "N/A"
+            district = "N/A"
         
         reverseGeocoding_locations = offer_data.get("location", {}).get("reverseGeocoding", {}).get("locations", [])
         for data in reverseGeocoding_locations:
-            dzielnica = data.get("name") if data.get("locationLevel") == "district" else "Brak"
+            dzielnica = data.get("name") if data.get("locationLevel") == "district" else "N/A"
 
         # Zdjęcia
         images = []
-        images_html = offer_data.get("images", "Brak")
+        images_html = offer_data.get("images", "N/A")
         for element in images_html:
-            image_link = element.get("medium", "Brak")
+            image_link = element.get("medium", "N/A")
             image_response = fetch_page(image_link)
             arr = np.asarray(bytearray(image_response.content), dtype=np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)  
             images.append(img)
 
         # Linki
-        links = offer_data.get("links", {})
-        local_plan_url = links.get("localPlanUrl", "Brak linku")
-        video_url = links.get("videoUrl", "Brak linku")
-        view3d_url = links.get("view3dUrl", "Brak linku")
-        walkaround_url = links.get("walkaroundUrl", "Brak linku")
+        links = (offer_data.get("links", {}))
+        local_plan_url = (links.get("localPlanUrl", "N/A"))
+        video_url = (links.get("videoUrl", "N/A"))
+        view3d_url = (links.get("view3dUrl", "N/A"))
+        walkaround_url = (links.get("walkaroundUrl", "N/A"))
         
         # Sprzedający
-        seller = offer_data.get("owner", {})
-        owner_id = seller.get("id", "Brak")
-        owner_name = seller.get("name", "Brak")
+        seller = (offer_data.get("owner", {}))
+        owner_id = (seller.get("id", "N/A"))
+        owner_name = (seller.get("name", "N/A"))
 
-        agency = offer_data.get("agency", {})
+        agency = (offer_data.get("agency", {}))
         if agency:
-            agency_id = agency.get("id", "Brak")
-            agency_name = agency.get("name", "Brak")
+            agency_id = (agency.get("id", "N/A"))
+            agency_name = (agency.get("name", "N/A"))
         else:
-            agency_id = "Brak"
-            agency_name = "Brak"
-
-        
-        """print("Dane podstawowe oferty:")
-        print(f"ID oferty: {id}")
-        print(f"Rynek: {market}")
-        print(f"Typ ogłoszeniodawcy: {advertiser_type}")
-        print(f"Typ ogłoszenia: {advert_type}")
-        print(f"Data utworzenia: {date_created}")
-        print(f"Data modyfikacji: {date_modified}")
-        print(f"pushed_ap_at: {pushed_ap_at}")
-        print(f"exclusive_offer: {exclusive_offer}") 
-        print(f"creation_source: {creation_source}")
-
-        print("\nDane podstawowe mieszkania:")
-        print(f"Opis: {description_text[:100]}...")  # Wyświetlamy tylko część opisu
-        print(f"Powierzchnia: {area}")
-        print(f"Cena: {price}")
-        print(f"Cena za m2: {price_per_m}")
-        print(f"Czynsz: {rent}")
-        print(f"Liczba pokoi: {rooms_num}")
-        print(f"Piętro: {floor_no}")
-        print(f"Ogrzewanie: {heating}")
-        print(f"Forma własności: {building_ownership}")
-        print(f"ProperType: {properType}")
-        print(f"Stan wykończenia: {construction_status}")
-        print(f"media: {cechy_media}")
-        print(f"zabezpieczenia: {cechy_zabezpieczenia}")
-        print(f"wyposazenie: {cechy_wyposazenie}")
-        print(f"informacje_dodatkowe: {cechy_informacje_dodatkowe}")
-        print(f"Cechy: {features_str}")
-
-        print("\nLokalizacja:")
-        print(f"location: {locations}")
-        print(f"Miasto: {city}")
-        print(f"District: {district}")
-        print(f"Subdistrict: {subdistrict}")
-        print(f"Street: {street}")
-        print(f"Dzielnica: {dzielnica}")
-
-        print("\nSzczegóły budynku:")
-        print(f"Rok budowy budynku: {build_year}")
-        print(f"Ilość pięter w budynku: {building_floors_num}")
-        print(f"Materiał budowlany: {building_material}")
-        print(f"Rodzaj zabudowy: {building_type}")
-        print(f"Typ okien: {windows_type}")
-        print(f"Security types: {security_types}")
-
-        print("\nLinki:")
-        print(f"Local Plan URL: {local_plan_url}")
-        print(f"Video URL: {video_url}")
-        print(f"3D View URL: {view3d_url}")
-        print(f"Walkaround URL: {walkaround_url}")
-
-        print("\nSprzedający:")
-        print(f"owner_id: {owner_id}")
-        print(f"owner_name: {owner_name}")
-        print(f"agency_id: {agency_id}")
-        print(f"agency_name: {agency_name}")"""
+            agency_id = "N/A"
+            agency_name = "N/A"
 
         # podstawowe informacje o ofercie
         data = {}
-        data["id"] = id
-        data["title"] = title
-        data["market"] = market
-        data["advertiser_type"] = advertiser_type
-        data["advert_type"] = advert_type
-        data["date_created"] = date_created
-        data["date_modified"] = date_modified
-        data["pushed_ap_at"] = pushed_ap_at
-        data["exclusive_offer"] = exclusive_offer
+        data["id"] = listing_id
+        data["title"] = listing_title
+        data["market"] = market_type
+        data["advert_type"] = advertisement_type
+        data["date_created"] = creation_date
+        data["date_modified"] = last_modified_date
+        data["pushed_ap_at"] = promoted_at
+        data["exclusive_offer"] = is_exclusive_offer
         data["creation_source"] = creation_source
 
         #cechy mieszkania
-        data["description_text"] = description_text[:1000] + "..."  # Wyświetlamy tylko część opisu
+        data["description_text"] = description_text
         data["area"] = area
         data["price"] = price
         data["price_per_m"] = price_per_m
         data["rent"] = rent
         data["rooms_num"] = rooms_num
-        data["floor_no"] = floor_no
-        data["heating"] = heating
+        data["floor_num"] = floor_num
+        data["heating"] = heating_type
         data["building_ownership"] = building_ownership
-        data["properType"] = properType
+        data["properType"] = proper_type
         data["construction_status"] = construction_status
-        data["features_str"] = features_str
-        data["cechy_media"] = cechy_media
-        data["cechy_zabezpieczenia"] = cechy_zabezpieczenia
-        data["cechy_wyposazenie"] = cechy_wyposazenie
-        data["cechy_informacje_dodatkowe"] = cechy_informacje_dodatkowe
+        data["feautures_media"] = feautures_media
+        data["features_security"] = features_security
+        data["features_equipment"] = features_equipment
+        data["features_additional_information"] = features_additional_information
         data["features_without_category"] = features_without_category
 
         # lokalizacja
@@ -279,7 +255,7 @@ def download_data_from_listing_page(html_response):
 
         # szczegółu budynku
         data["build_year"] = build_year
-        data["building_floors_num"] = building_floors_num
+        data["building_floors_num"] = building_floors_count
         data["building_material"] = building_material
         data["building_type"] = building_type
         data["windows_type"] = windows_type
@@ -303,7 +279,19 @@ def download_data_from_listing_page(html_response):
         return data
 
 
-def save_data_to_excel(data, file_name="output_data/data.xlsx"):
+def save_data_to_excel(data:dict, file_name:str="output_data/data.xlsx"):
+    """
+    Saves the provided data to an Excel file. If the file exists, new data is 
+    appended to the existing sheet.
+
+    Parameters:
+        data (dict): A dictionary containing the data to be saved to the Excel file.
+        file_name (str): The path to the Excel file where the data will be saved 
+        (default is 'output_data/data.xlsx').
+
+    Raises:
+        FileNotFoundError: If the Excel file does not exist and cannot be created.
+    """
     df = pd.DataFrame([data])
 
     try:
