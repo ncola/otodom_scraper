@@ -1,7 +1,11 @@
 import pandas as pd
-import requests, cv2, json
+import requests, cv2, json, re
 from bs4 import BeautifulSoup
 import numpy as np
+from datetime import datetime
+
+
+# DOWNLOAD DATA
 
 def fetch_page(url: str) -> requests.Response:
     """
@@ -111,109 +115,93 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
 
         # Debug: wydrukowanie tylko tej części JSON, zaczynając od ...
         #print("Struktura JSON (od props/pageProps/ad):", json.dumps(offer_data, indent=7)[:420000])
-        #print("\n")
 
-        listing_id = offer_data.get("id", "N/A")
-        listing_title = offer_data.get("title", "N/A")
+        listing_id = offer_data.get("id", None)
+        listing_title = offer_data.get("title", None)
         listing_title = BeautifulSoup(listing_title, "html.parser").get_text()
-        market_type = str(offer_data.get("market", "N/A")).lower()
-        advertisement_type = str(offer_data.get("advertType", "N/A")).lower()
-        creation_date = offer_data.get("createdAt", "N/A")
-        last_modified_date = offer_data.get("modifiedAt", "N/A")
-        description = offer_data.get("description", "N/A")
+        market_type = str(offer_data.get("market", None)).lower()
+        advertisement_type = str(offer_data.get("advertType", None)).lower()
+        creation_date = offer_data.get("createdAt", None)
+        description = offer_data.get("description", None)
         description_text = BeautifulSoup(description, "html.parser").get_text()
-        is_exclusive_offer = offer_data.get("exclusiveOffer", "N/A") # True/False
-        creation_source = str(offer_data.get("creationSource", "N/A"))
-        promoted_at = offer_data.get("pushedUpAt", "N/A")
-        heating_type = str(offer_data.get("property", {}).get("buildingProperties", {}).get("heating", "N/A")).lower()
-      
-        # cechy w podziale na kategorie
-        features_by_category = offer_data.get("featuresByCategory", [])
-
-        categories_names_HTML = ['Media', 'Zabezpieczenia', 'Wyposażenie', 'Informacje dodatkowe']
-        categories_names_variables = ['feautures_media', 'features_security', 'features_equipment', 'features_additional_information']
-
-        for category_name, category_name_variable in zip(categories_names_HTML, categories_names_variables):
-            matching_category = next((category for category in features_by_category if category.get('label') == category_name), None)
-            if matching_category:
-                values = matching_category.get("values", [])
-                globals()[category_name_variable]  = ', '.join(values) if values else "N/A"
-            else:
-                globals()[category_name_variable]  = "N/A"
-
-        features_without_category = offer_data.get("featuresWithoutCategory", "N/A")
+        is_exclusive_offer = offer_data.get("exclusiveOffer", None) # True/False
+        creation_source = str(offer_data.get("creationSource", None))
+        promoted_at = offer_data.get("pushedUpAt", None)
+        heating_type = str(offer_data.get("property", {}).get("buildingProperties", {}).get("heating", None)).lower()
 
         target = offer_data.get("target", {})
-        area = target.get("Area", "N/A")
-        build_year = target.get("Build_year", "N/A")
-        building_floors_count = target.get("Building_floors_num", "N/A")
-        building_material = str(target.get("Building_material", "N/A"))
-        building_ownership = str(target.get("Building_ownership", "N/A")) # ownership (Własność); cooperative_ownership (Spółdzielcze własnościowe prawo do lokalu); land_ownership (Własność gruntu); state_ownership (Własność państwowa); municipal_ownership (Własność komunalna)
-        building_type = str(target.get("Building_type", "N/A"))
-        city = target.get("City", "N/A")
-        construction_status = str(target.get("Construction_status", "N/A")) #under_construction; completed; planned; ready_for_occupancy
-        floor_num = str(target.get("Floor_no", "N/A"))
-        price = int(target.get("Price", "N/A"))
-        price_per_m = float(target.get("Price_per_m", "N/A"))
-        proper_type = target.get("ProperType", "N/A") #Mieszkanie; Dom; Działka; Komercyjna; Inny
-        rent = target.get("Rent", "N/A") #czasem ludzie wpisują '0' a czasem jest puste pole
-        windows_type = str(target.get("Windows_type", "N/A"))
-        security_types = str(target.get("Security_types", "N/A"))
+        # Cechy
+        features_equipment = target.get("Equipment_types", None)
+        features_additional_information = target.get("Extras_types", None)
+        features_utilities = target.get("Media_types", None)
+
+        area = target.get("Area", None)
+        building_build_year = target.get("Build_year", None)
+        building_floors_count = target.get("Building_floors_num", None)
+        building_material = str(target.get("Building_material", None))
+
+        characteristics = offer_data.get("characteristics", {})        
+        for characteristic in characteristics:
+            if characteristic["key"] == "building_ownership":
+                ownership = characteristic.get("localizedValue", None) # ownership (Własność); cooperative_ownership (Spółdzielcze własnościowe prawo do lokalu); land_ownership (Własność gruntu); state_ownership (Własność państwowa); municipal_ownership (Własność komunalna)
+            else:
+                ownership = None
+        
+        building_type = str(target.get("Building_type", None))
+        energy_certificate = target.get("Energy_certificate", None)        
+        city = target.get("City", None)
+        voivodeship = target.get("Province", None)
+        construction_status = str(target.get("Construction_status", None)) #under_construction; completed; planned; ready_for_occupancy
+        floor_num = str(target.get("Floor_no", None))
+        price = target.get("Price", None)
+        price_per_m = target.get("Price_per_m", None)
+        proper_type = target.get("ProperType", None) #Mieszkanie; Dom; Działka; Komercyjna; Inny
+        rent = target.get("Rent", None) #czasem ludzie wpisują '0' a czasem jest puste pole
+        windows_type = str(target.get("Windows_type", None))
+        security_types = str(target.get("Security_types", None))
         if isinstance(security_types, list):
             security_types = ', '.join(data for data in security_types)
-        rooms_num = str(target.get("Rooms_num", "N/A"))
+        rooms_num = str(target.get("Rooms_num", None))
         
-
-        breadcrumbs = offer_data.get("breadcrumbs", [])
-        locations = " - ".join(breadcrumb.get("locative", "") for breadcrumb in breadcrumbs)
-
         location_data = offer_data.get("location", {}).get("address", {})
         if location_data:
-            street = location_data.get("street", {}).get("name", "N/A") if location_data.get("street") else "N/A"
-            subdistrict = location_data.get("subdistrict", "N/A") if location_data.get("subdistrict") else "N/A"
-            district = location_data.get("district", "N/A") if location_data.get("district") else "N/A"
-            if isinstance(district, dict):
-                district = ", ".join((str(data) for data in list(district.values())[1:-1])) #keys: id, code, name
-            else:
-                district = district
+            street = location_data.get("street", {}).get("name", None) if location_data.get("street") else None
         else:
-            street = "N/A"
-            subdistrict = "N/A"
-            district = "N/A"
+            street = None
         
         reverseGeocoding_locations = offer_data.get("location", {}).get("reverseGeocoding", {}).get("locations", [])
         for data in reverseGeocoding_locations:
-            dzielnica = data.get("name") if data.get("locationLevel") == "district" else "N/A"
+            district = data.get("name") if data.get("locationLevel") == "district" else None
 
         # Zdjęcia
         images = []
-        images_html = offer_data.get("images", "N/A")
+        images_html = offer_data.get("images", None)
         for element in images_html:
-            image_link = element.get("medium", "N/A")
+            image_link = element.get("medium", None)
             image_response = fetch_page(image_link)
             arr = np.asarray(bytearray(image_response.content), dtype=np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)  
             images.append(img)
 
-        # Linki
+        # linki
         links = (offer_data.get("links", {}))
-        local_plan_url = (links.get("localPlanUrl", "N/A"))
-        video_url = (links.get("videoUrl", "N/A"))
-        view3d_url = (links.get("view3dUrl", "N/A"))
-        walkaround_url = (links.get("walkaroundUrl", "N/A"))
+        local_plan_url = (links.get("localPlanUrl", None))
+        video_url = (links.get("videoUrl", None))
+        view3d_url = (links.get("view3dUrl", None))
+        walkaround_url = (links.get("walkaroundUrl", None))
         
-        # Sprzedający
+        # sprzedający
         seller = (offer_data.get("owner", {}))
-        owner_id = (seller.get("id", "N/A"))
-        owner_name = (seller.get("name", "N/A"))
+        owner_id = (seller.get("id", None))
+        owner_name = (seller.get("name", None))
 
         agency = (offer_data.get("agency", {}))
         if agency:
-            agency_id = (agency.get("id", "N/A"))
-            agency_name = (agency.get("name", "N/A"))
+            agency_id = (agency.get("id", None))
+            agency_name = (agency.get("name", None))
         else:
-            agency_id = "N/A"
-            agency_name = "N/A"
+            agency_id = None
+            agency_name = None
 
         # podstawowe informacje o ofercie
         data = {}
@@ -222,7 +210,6 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
         data["market"] = market_type
         data["advert_type"] = advertisement_type
         data["date_created"] = creation_date
-        data["date_modified"] = last_modified_date
         data["pushed_ap_at"] = promoted_at
         data["exclusive_offer"] = is_exclusive_offer
         data["creation_source"] = creation_source
@@ -232,29 +219,26 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
         data["area"] = area
         data["price"] = price
         data["price_per_m"] = price_per_m
-        data["rent"] = rent
+        data["rent_amount"] = rent
         data["rooms_num"] = rooms_num
         data["floor_num"] = floor_num
         data["heating"] = heating_type
-        data["building_ownership"] = building_ownership
-        data["properType"] = proper_type
+        data["ownership"] = ownership
+        data["proper_type"] = proper_type
         data["construction_status"] = construction_status
-        data["feautures_media"] = feautures_media
-        data["features_security"] = features_security
+        data["features_utilities"] = features_utilities
         data["features_equipment"] = features_equipment
         data["features_additional_information"] = features_additional_information
-        data["features_without_category"] = features_without_category
+        data["energy_certificate"] = energy_certificate
 
         # lokalizacja
-        data["locations"] = locations
+        data["voivodeship"] = voivodeship
         data["city"] = city
         data["district"] = district
-        data["subdistrict"] = subdistrict
         data["street"] = street
-        data["dzielnica"] = dzielnica
 
         # szczegółu budynku
-        data["build_year"] = build_year
+        data["building_build_year"] = building_build_year
         data["building_floors_num"] = building_floors_count
         data["building_material"] = building_material
         data["building_type"] = building_type
@@ -270,14 +254,113 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
         # zdjęcia
         data["images"] = images
         
-        # sprzedajacy
+        # Sprzedajacy
         data["owner_id"] = owner_id
         data["owner_name"] = owner_name
         data["agency_id"] = agency_id
         data["agency_name"] = agency_name
 
+        # Link do oferty
+        data["offer_link"] = f"https://www.otodom.pl/pl/oferta/{offer_data.get('slug', '')}"
+
+        data['active'] = True
+
+
         return data
 
+
+# CLEANING DATA
+
+FLOOR_MAPPING = {
+    "['ground_floor']": 0,
+    "['floor_1']": 1,
+    "['floor_2']": 2,
+    "['floor_3']": 3,
+    "['floor_4']": 4,
+    "['floor_5']": 5,
+    "['floor_6']": 6,
+    "['floor_7']": 7,
+    "['floor_8']": 8,
+    "['floor_9']": 9,
+    "['floor_10']": 10,
+    "['floor_higher_10']": ">10"
+}
+
+OWNERSHIP_MAPPING = {
+    "pełna własność": "full_ownership",
+    "spółdzielcze wł. prawo do lokalu": "cooperative_ownership",
+}
+
+def clear_floor_num(data):
+    return FLOOR_MAPPING.get(data, None)
+
+def simplify_ownership(data):
+    return OWNERSHIP_MAPPING.get(data, None)
+
+def extract_rooms_num(val):
+    match = re.search(r'\d+', str(val))
+    return int(match.group()) if match else None
+
+def extract_text(data):
+    if data is None:
+        return None
+    if isinstance(data, list):
+        clean = ' '.join(data).strip("[]'") 
+    else:
+        clean = data.strip("[]'")
+    return clean
+
+def clear_numbers(data, val='int'):
+    if data is not None:
+        if val == 'int':
+            return int(data)
+        elif val == 'float':
+            return float(data)
+
+def clean_text(text):
+    if text is None:
+        return None
+    text = text.replace("\n", " ") 
+    text = text.replace("\xa0", " ")  
+    text = re.sub(r'\s+', ' ', text).strip()  
+    return text
+
+
+def transform_data(data):
+    transformed_data = data.copy()
+
+    transformed_data["rooms_num"] = extract_rooms_num(transformed_data.get("rooms_num"))
+
+    transformed_data["floor_num"] = clear_floor_num(transformed_data.get("floor_num"))
+
+    transformed_data["ownership"] = simplify_ownership(transformed_data.get("ownership"))
+    
+    transformed_data['construction_status'] = extract_text(transformed_data.get('construction_status'))
+    transformed_data['building_material'] = extract_text(transformed_data.get('building_material'))
+    transformed_data['building_type'] = extract_text(transformed_data.get('building_type'))
+    transformed_data['windows_type'] = extract_text(transformed_data.get('windows_type'))
+    transformed_data['security_types'] = extract_text(transformed_data.get('security_types'))
+    transformed_data['features_additional_information'] = extract_text(transformed_data.get('features_additional_information'))
+    transformed_data['features_equipment'] = extract_text(transformed_data.get('features_equipment'))
+    transformed_data['features_utilities'] = extract_text(transformed_data.get('features_utilities'))
+    transformed_data['energy_certificate'] = extract_text(transformed_data.get('energy_certificate'))
+
+    transformed_data['description_text'] = clean_text(transformed_data.get('description_text'))
+    
+    if transformed_data.get('date_created'):
+        date_created = datetime.strptime(transformed_data['date_created'], '%Y-%m-%dT%H:%M:%S%z')
+        transformed_data['time_created'] = date_created.strftime('%H:%M')
+        transformed_data['date_created'] = date_created.date()  # only the date part
+    
+    transformed_data['area'] = clear_numbers(transformed_data.get('area'), val='float')
+    transformed_data['price'] = clear_numbers(transformed_data.get('price'), val='int')
+    transformed_data['price_per_m'] = clear_numbers(transformed_data.get('price_per_m'), val='int')
+
+    return transformed_data
+
+
+
+# SAVING DATA
 
 def save_data_to_excel(data:dict, file_name:str="output_data/data.xlsx"):
     """
@@ -310,3 +393,10 @@ def save_data_to_excel(data:dict, file_name:str="output_data/data.xlsx"):
             df.to_excel(writer, index=False, header=True, sheet_name='oferty')
 
     print(f"Data has been successfully saved to {file_name}")
+
+
+
+
+#page = fetch_page("https://www.otodom.pl/pl/oferta/mieszkanie-2-pokojowe-48m2-katowice-koszutka-ID4wQpd")
+#page = fetch_page("https://www.otodom.pl/pl/oferta/luksusowe-m-3-katowice-os-tysiaclecia-ID4wQmQ")
+#download_data_from_listing_page(page)

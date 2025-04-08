@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import pandas as pd
-from utils import save_data_to_excel, fetch_page, download_data_from_searching_page, download_data_from_listing_page
+from utils import save_data_to_excel, fetch_page, download_data_from_searching_page, download_data_from_listing_page, transform_data
 
 url_main = "https://www.otodom.pl/pl/wyniki/sprzedaz/mieszkanie/slaskie/katowice?by=LATEST&direction=DESC"
 
@@ -14,8 +14,9 @@ def scrape_all_page_to_excel(url=url_main):
         link_offer = offer.get("link")
         response = fetch_page(link_offer)
         offer_data = download_data_from_listing_page(response)
-        save_data_to_excel(offer_data, 'data_katowice.xlsx')
-
+        cleaned_offer_data = transform_data(offer_data)
+        cleaned_offer_data.pop('images')
+        save_data_to_excel(cleaned_offer_data, 'output_data/data_katowice.xlsx')
 
 def scrape_all_page(url=url_main):
     response = fetch_page(url)
@@ -34,4 +35,4 @@ def scrape_all_page(url=url_main):
 
 
 
-#scrape_all_page()
+#scrape_all_page_to_excel()

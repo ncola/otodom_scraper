@@ -52,6 +52,8 @@ def create_tables():
 
         #table: history_of_offers
 
+        #table: photos
+
         
         conn.commit()
     except Exception as error:
