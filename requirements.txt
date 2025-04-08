@@ -15,3 +15,5 @@ soupsieve==2.6
 typing_extensions==4.12.2
 tzdata==2025.1
 urllib3==2.3.0
+python-dotenv-1.1.0
+psycopg2-binary-2.9.10
