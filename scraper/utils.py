@@ -65,20 +65,21 @@ def download_data_from_searching_page(html_response: requests.Response) -> list:
         all_offers = []
 
         for offer in offers:
+            listing_id = offer.get("id", None)
             title = offer.get("title", "Brak tytułu")
             total_price = offer.get("totalPrice", {})
             price = total_price.get("value", "Brak ceny") if isinstance(total_price, dict) else "Brak ceny"
-            
             link = f"https://www.otodom.pl/pl/oferta/{offer.get('slug', 'Brak linku')}"
-            date_created = offer.get("dateCreated", "Brak daty utworzenia")
-            date_created_first = offer.get("dateCreatedFirst", "Brak daty pierwszego utworzenia")
+            creation_date = offer.get("dateCreated", "Brak daty utworzenia")
+            creation_date_first = offer.get("dateCreatedFirst", "Brak daty pierwszego utworzenia")
             
             all_offers.append({
+                'listing_id': listing_id,
                 'title': title,
                 'price': price,
                 'link': link,
-                'date_created': date_created,
-                'date_created_first': date_created_first
+                'creation_date': creation_date,
+                'creation_date_first': creation_date_first
             })
         
         return all_offers
@@ -180,8 +181,11 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
             image_link = element.get("medium", None)
             image_response = fetch_page(image_link)
             arr = np.asarray(bytearray(image_response.content), dtype=np.uint8)
-            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)  
-            images.append(img)
+            img = cv2.imdecode(arr, cv2.IMREAD_COLOR) # konwersja na obraz
+            success, encoded_image = cv2.imencode('.jpg', img) # zakodowanie obrazu na dane binarne jpg (na potrzeby postgreSQL)
+            if success:
+                binary_image = encoded_image.tobytes() 
+                images.append(binary_image)
 
         # linki
         links = (offer_data.get("links", {}))
@@ -205,11 +209,11 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
 
         # podstawowe informacje o ofercie
         data = {}
-        data["id"] = listing_id
+        data["listing_id"] = listing_id
         data["title"] = listing_title
         data["market"] = market_type
         data["advert_type"] = advertisement_type
-        data["date_created"] = creation_date
+        data["creation_date"] = creation_date
         data["pushed_ap_at"] = promoted_at
         data["exclusive_offer"] = is_exclusive_offer
         data["creation_source"] = creation_source
@@ -265,7 +269,6 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
 
         data['active'] = True
 
-
         return data
 
 
@@ -283,7 +286,7 @@ FLOOR_MAPPING = {
     "['floor_8']": 8,
     "['floor_9']": 9,
     "['floor_10']": 10,
-    "['floor_higher_10']": ">10"
+    "['floor_higher_10']": "10+"
 }
 
 OWNERSHIP_MAPPING = {
@@ -307,7 +310,7 @@ def extract_text(data):
     if isinstance(data, list):
         clean = ' '.join(data).strip("[]'") 
     else:
-        clean = data.strip("[]'")
+        clean = data.strip("[]',")
     return clean
 
 def clear_numbers(data, val='int'):
@@ -339,23 +342,44 @@ def transform_data(data):
     transformed_data['building_material'] = extract_text(transformed_data.get('building_material'))
     transformed_data['building_type'] = extract_text(transformed_data.get('building_type'))
     transformed_data['windows_type'] = extract_text(transformed_data.get('windows_type'))
+
     transformed_data['security_types'] = extract_text(transformed_data.get('security_types'))
     transformed_data['features_additional_information'] = extract_text(transformed_data.get('features_additional_information'))
     transformed_data['features_equipment'] = extract_text(transformed_data.get('features_equipment'))
     transformed_data['features_utilities'] = extract_text(transformed_data.get('features_utilities'))
+    transformed_data['features'] = ' '.join([
+        str(transformed_data.get('features_additional_information', '')).lower(),
+        str(transformed_data.get('features_equipment', '')).lower(),
+        str(transformed_data.get('features_utilities', '')).lower(),
+        str(transformed_data.get('security_types', '')).lower()
+    ])
+    if ',' in transformed_data['features']:
+        transformed_data['features'] = transformed_data['features'].replace(',', ' ')
+    if "'" in transformed_data['features']:
+        transformed_data['features'] = transformed_data['features'].replace("'", "")
+    if "cable-television" in transformed_data['features']:
+        transformed_data['features'] = transformed_data['features'].replace("cable-television", "cable_television")
+
+    del transformed_data['security_types']
+    del transformed_data['features_additional_information']
+    del transformed_data['features_equipment']
+    del transformed_data['features_utilities']
+
     transformed_data['energy_certificate'] = extract_text(transformed_data.get('energy_certificate'))
 
     transformed_data['description_text'] = clean_text(transformed_data.get('description_text'))
     
-    if transformed_data.get('date_created'):
-        date_created = datetime.strptime(transformed_data['date_created'], '%Y-%m-%dT%H:%M:%S%z')
-        transformed_data['time_created'] = date_created.strftime('%H:%M')
-        transformed_data['date_created'] = date_created.date()  # only the date part
+    if transformed_data.get('creation_date'):
+        creation_date = datetime.strptime(transformed_data['creation_date'], '%Y-%m-%dT%H:%M:%S%z')
+        transformed_data['creation_time'] = creation_date.strftime('%H:%M')
+        transformed_data['creation_date'] = creation_date.date()  
     
     transformed_data['area'] = clear_numbers(transformed_data.get('area'), val='float')
     transformed_data['price'] = clear_numbers(transformed_data.get('price'), val='int')
     transformed_data['price_per_m'] = clear_numbers(transformed_data.get('price_per_m'), val='int')
 
+    transformed_data['closing_date'] = None
+    
     return transformed_data
 
 
@@ -398,5 +422,5 @@ def save_data_to_excel(data:dict, file_name:str="output_data/data.xlsx"):
 
 
 #page = fetch_page("https://www.otodom.pl/pl/oferta/mieszkanie-2-pokojowe-48m2-katowice-koszutka-ID4wQpd")
-#page = fetch_page("https://www.otodom.pl/pl/oferta/luksusowe-m-3-katowice-os-tysiaclecia-ID4wQmQ")
-#download_data_from_listing_page(page)
+#page = fetch_page("https://www.otodom.pl/pl/oferta/dwupoziomowe-z-duzym-ogrodkiem-4-pokoje-ID4wyXG")
+#print(download_data_from_listing_page(page))

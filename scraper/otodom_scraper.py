@@ -3,10 +3,11 @@ from bs4 import BeautifulSoup
 import json
 import pandas as pd
 from utils import save_data_to_excel, fetch_page, download_data_from_searching_page, download_data_from_listing_page, transform_data
+from db.setup_and_manage_database import insert_new_listing
 
 url_main = "https://www.otodom.pl/pl/wyniki/sprzedaz/mieszkanie/slaskie/katowice?by=LATEST&direction=DESC"
 
-def scrape_all_page_to_excel(url=url_main):
+def scrape_all_pages_to_excel(url=url_main):
     response = fetch_page(url)
     offers = download_data_from_searching_page(response)
     
@@ -18,21 +19,28 @@ def scrape_all_page_to_excel(url=url_main):
         cleaned_offer_data.pop('images')
         save_data_to_excel(cleaned_offer_data, 'output_data/data_katowice.xlsx')
 
-def scrape_all_page(url=url_main):
+offers_data = []
+def scrape_all_pages(url=url_main):
     response = fetch_page(url)
     offers = download_data_from_searching_page(response)
     
     print(f"Znaleziono: {len(offers)} ofert")
     n=0
-    for offer in offers:
+    for offer in offers[:2]:
         link_offer = offer.get("link")
+        id = offer.get("listing_id")
         response = fetch_page(link_offer)
         print("-------------------")
-        print(f"Numer oferty: {n}")
         offer_data = download_data_from_listing_page(response)
+        print(f"Pobrano ofertę o id {id}")
+        cleaned_offer_data = transform_data(offer_data)
+        offers_data.append(cleaned_offer_data)
         n+=1
-    return offer_data
-
+    return offers_data
 
 
 #scrape_all_page_to_excel()
+#data = scrape_all_pages()
+#insert_new_listing(data)    
+
+
