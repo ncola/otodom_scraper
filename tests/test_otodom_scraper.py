@@ -8,8 +8,8 @@ scraper_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
 if scraper_path not in sys.path:
     sys.path.insert(0, scraper_path)
 
-from scraper.otodom_scraper import scrape
-from scraper.utils import fetch_page
+from scraper.scraper import scrape
+from scraper.fetch_and_parse import fetch_page
 
 # konfiguracja loggera
 log_file = 'logs/test_log.txt'  
