@@ -1,4 +1,4 @@
-import requests, cv2, json
+import requests, cv2, json, time, random
 from bs4 import BeautifulSoup
 import numpy as np
 
@@ -6,6 +6,9 @@ import numpy as np
 def fetch_page(url: str) -> requests.Response:
     """
     Fetches the content of a webpage in Polish language.
+
+    A delay (random sleep) is added between requests to avoid being blocked by the server due to
+    making too many requests in a short period
 
     Args:
     url (str): The URL of the page to fetch.
@@ -24,6 +27,7 @@ def fetch_page(url: str) -> requests.Response:
     }
 
     response = requests.get(url, headers=headers)
+    time.sleep(random.uniform(1, 3))
 
     if response.status_code == 200:
         return response
@@ -32,54 +36,108 @@ def fetch_page(url: str) -> requests.Response:
         return None
 
 
-def download_data_from_searching_page(html_response: requests.Response) -> list:
+def get_total_pages(html_response: requests.Response) ->int:
     """
-    Extracts listing information from the HTML content of a search results page (for otodom.com).
+    Parses the total number of search result pages from the HTML response of the first Otodom search page.
+
+    This function is used internally by download_data_from_searching_page() to determine how many
+    pages of listings are available for scraping. 
 
     Args:
-    html_response (requests.Response): The response object containing the HTML content of the page.
+        html_response (requests.Response): The HTTP response object from the first search result page
 
     Returns:
-    list: A list of dictionaries, each containing details about an offer such as title, price, link, 
-          date of creation, and the first creation date.
+        int: The total number of pages available for the search. Returns 0 if parsing fails or data is missing
 
     Raises:
-    Exception: If the HTML response is None or if there is an issue parsing the data from the page.
+        Exception: If the response is None
     """
-    if html_response is None:
-        raise Exception(f"Wystąpił błąd w pobraniu danych ze strony")
-    
-    soup = BeautifulSoup(html_response.text, 'html.parser')
-    script_tag = soup.find('script', {'id':'__NEXT_DATA__'}) 
-    
-    if script_tag:
-        json_data = json.loads(script_tag.string)
-
-        offers = json_data.get("props", {}).get("pageProps", {}).get("data", {}).get("searchAds", {}).get("items", [])
+    try:
+        if html_response is None:
+            raise Exception(f"Wystąpił błąd w pobraniu danych ze strony")
         
-        all_offers = []
+        soup = BeautifulSoup(html_response.text, 'html.parser')
+        script_tag = soup.find('script', {'id': '__NEXT_DATA__'})
+        if script_tag:
+            json_data = json.loads(script_tag.string)
+
+            #page_nb = json_data.get("page_nb", {})
+            page_count = json_data.get("props", {}).get("pageProps", {}).get("tracking", {}).get("listing", {}).get("page_count", 0)
+            #result_count = json_data.get("result_count", {})
+            #results_per_page = json_data.get("results_per_page", {})
+            
+            print(f"Liczba stron wyszukiwania: {page_count}")
+            return page_count
+        
+    except Exception as error:
+        print(f"Error during getting total pages: {error}")
+
+
+def download_data_from_search_results(base_url: str) -> list:
+    """
+    Extracts listing information from all paginated search result pages on otodom.com.
+
+    This function iterates through all pages of search results starting from the given base URL,
+    parses the embedded JSON data in each page's HTML, and collects basic information about 
+    each listing (ID, area, price, and link).
+
+    Args:
+        base_url (str): The base search URL (without the `&page=` parameter).
+
+    Returns:
+        list: A list of dictionaries, each containing:
+            - listing_id (int): Unique ID of the listing.
+            - area (float): Area of the apartment in square meters.
+            - price (int or str): Total price of the apartment.
+            - link (str): URL to the individual listing.
+
+    Raises:
+        Exception: If the first page fails to load or parsing fails due to missing script tag.
+    """
+    all_offers = []
+
+    response_first_page = fetch_page(base_url)
+    if response_first_page is None:
+        raise Exception("Nie udało się pobrać pierwszej strony wyszukiwania, sprawdź URL.")
+
+    page_count = get_total_pages(response_first_page)
+    
+    page_count = 10 ########################### DO TESTOW, USUNAC
+
+    for page in range(1, page_count):
+        page_url = f"{base_url}&page={page}"
+        print(f"Pobieranie strony {page} z {page_count}")
+        
+        response = fetch_page(page_url)
+        if response is None:
+            print(f"Nie udało się pobrać strony {page}.")
+            continue
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        script_tag = soup.find('script', {'id': '__NEXT_DATA__'}) 
+
+        if not script_tag:
+            print(f"Błąd przy stronie {page}: brak skryptu z danymi.")
+            continue
+
+        json_data = json.loads(script_tag.string)
+        offers = json_data.get("props", {}).get("pageProps", {}).get("data", {}).get("searchAds", {}).get("items", [])
 
         for offer in offers:
-            listing_id = offer.get("id", None)
-            title = offer.get("title", "Brak tytułu")
+            listing_id = offer.get("id")
+            area = offer.get("area", 0)
             total_price = offer.get("totalPrice", {})
             price = total_price.get("value", "Brak ceny") if isinstance(total_price, dict) else "Brak ceny"
             link = f"https://www.otodom.pl/pl/oferta/{offer.get('slug', 'Brak linku')}"
-            creation_date = offer.get("dateCreated", "Brak daty utworzenia")
-            creation_date_first = offer.get("dateCreatedFirst", "Brak daty pierwszego utworzenia")
             
             all_offers.append({
                 'listing_id': listing_id,
-                'title': title,
+                'area': area,
                 'price': price,
-                'link': link,
-                'creation_date': creation_date,
-                'creation_date_first': creation_date_first
+                'link': link
             })
-        
-        return all_offers
-    else:
-        raise Exception(f"Błąd w pobraniu danych ze strony, script_tag: {script_tag}")
+
+    return all_offers
 
 
 def download_data_from_listing_page(html_response:requests.Response) -> dict:
