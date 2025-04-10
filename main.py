@@ -4,8 +4,8 @@ if scraper_path not in sys.path:
     sys.path.append(scraper_path)
 
 from scraper.scraper import scrape_all_pages, is_allowed_to_scrape
-from db.setup_database import create_tables
-from db.insert_data import insert_new_listing
+from db.db_setup import create_tables
+from db.db_operations import insert_new_listing, update_offers
 
 #url_main = "https://www.otodom.pl/pl/wyniki/sprzedaz/mieszkanie/slaskie/katowice?by=LATEST&direction=DESC"
 url= "https://www.otodom.pl/pl/wyniki/sprzedaz/mieszkanie/slaskie/katowice/katowice/katowice?viewType=listing&by=LATEST&direction=DESC&limit=72"
@@ -14,18 +14,26 @@ def main():
     try:
         # Upewnij się, ze to dozwolone
         result = is_allowed_to_scrape(url)
-        print(f"Is fetching page {url} allowed?: {result}")
+        print(f"\nIs fetching page {url} allowed?: {result}\n")
 
         # Utwórz tabele jezeli nie istnieją
         create_tables()
 
         # Pobierz dane
-        offers_data = scrape_all_pages(url)
+        need_update_offers, new_offers_to_database = scrape_all_pages(url)
 
         # Zapisz dane w bazie
-        for offer_data in offers_data:
+        print("\nRozpoczynam zapisywanie ofert w bazie.............")
+        for offer_data in new_offers_to_database:
             insert_new_listing(offer_data)  
             print("-"*10)
+            print("Zakończono wprowadzanie danych do bazy")
+        
+        # Update danych w bazie
+        print("\nRozpoczynam update ofert w bazie.............")
+        for offer in need_update_offers:
+            update_offers(offer)
+            print("Zakończono update danych w bazie")
             
     except Exception as error:
         print(f"Error main: {error}")

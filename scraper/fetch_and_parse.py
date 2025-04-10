@@ -1,6 +1,7 @@
 import requests, cv2, json, time, random
 from bs4 import BeautifulSoup
 import numpy as np
+from db.db_operations import get_db_connection
 
 
 def fetch_page(url: str) -> requests.Response:
@@ -61,12 +62,11 @@ def get_total_pages(html_response: requests.Response) ->int:
         if script_tag:
             json_data = json.loads(script_tag.string)
 
-            #page_nb = json_data.get("page_nb", {})
             page_count = json_data.get("props", {}).get("pageProps", {}).get("tracking", {}).get("listing", {}).get("page_count", 0)
             #result_count = json_data.get("result_count", {})
             #results_per_page = json_data.get("results_per_page", {})
             
-            print(f"Liczba stron wyszukiwania: {page_count}")
+            print(f"Liczba stron dla danego wyszukiwania: {page_count}")
             return page_count
         
     except Exception as error:
@@ -79,17 +79,18 @@ def download_data_from_search_results(base_url: str) -> list:
 
     This function iterates through all pages of search results starting from the given base URL,
     parses the embedded JSON data in each page's HTML, and collects basic information about 
-    each listing (ID, area, price, and link).
+    each listing (ID, area, price, price_per_m and link)
 
     Args:
-        base_url (str): The base search URL (without the `&page=` parameter).
+        base_url (str): The base search URL (without the `&page=` parameter)
 
     Returns:
         list: A list of dictionaries, each containing:
-            - listing_id (int): Unique ID of the listing.
-            - area (float): Area of the apartment in square meters.
-            - price (int or str): Total price of the apartment.
-            - link (str): URL to the individual listing.
+            - listing_id (int): listing ID from otodom
+            - area (float): area of the apartment in m2
+            - price (int): Total price 
+            - price_per_m (float): Price per m2
+            - link (str): URL to the individual listing
 
     Raises:
         Exception: If the first page fails to load or parsing fails due to missing script tag.
@@ -102,9 +103,7 @@ def download_data_from_search_results(base_url: str) -> list:
 
     page_count = get_total_pages(response_first_page)
     
-    page_count = 10 ########################### DO TESTOW, USUNAC
-
-    for page in range(1, page_count):
+    for page in range(1, page_count+1):
         page_url = f"{base_url}&page={page}"
         print(f"Pobieranie strony {page} z {page_count}")
         
@@ -117,7 +116,7 @@ def download_data_from_search_results(base_url: str) -> list:
         script_tag = soup.find('script', {'id': '__NEXT_DATA__'}) 
 
         if not script_tag:
-            print(f"Błąd przy stronie {page}: brak skryptu z danymi.")
+            print(f"Błąd przy stronie {page}: brak skryptu z danymi")
             continue
 
         json_data = json.loads(script_tag.string)
@@ -125,19 +124,126 @@ def download_data_from_search_results(base_url: str) -> list:
 
         for offer in offers:
             listing_id = offer.get("id")
-            area = offer.get("area", 0)
+            area = offer.get("areaInSquareMeters", 0)
             total_price = offer.get("totalPrice", {})
             price = total_price.get("value", "Brak ceny") if isinstance(total_price, dict) else "Brak ceny"
+            price_per_m = offer.get("pricePerSquareMeter", {}).get("value", "Brak ceny za m2")
             link = f"https://www.otodom.pl/pl/oferta/{offer.get('slug', 'Brak linku')}"
             
             all_offers.append({
                 'listing_id': listing_id,
                 'area': area,
                 'price': price,
+                'price_per_m': price_per_m,
                 'link': link
             })
 
     return all_offers
+
+
+def check_if_offer_exists(offer_data):
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        if conn is None:
+            print("Connection to the databas failed")
+            return
+        cur=conn.cursor()
+        
+        if_exists_query = """
+            SELECT id
+            FROM apartments_sale_listings
+            WHERE otodom_listing_id = %s AND area = %s
+            LIMIT 1
+            ;"""
+        
+        id = offer_data.get('listing_id')
+        area = offer_data.get('area')
+        if_exists_values = (id, area)
+
+        cur.execute(if_exists_query, if_exists_values)
+        result = cur.fetchone()
+        if result is None:
+            print(f"Oferta {id} o metrazu {area} nie istnieje w bazie")
+            return False
+        else:
+            print(f"Oferta {id} o metrazu {area} istnieje w bazie pod id: {result}")
+            return True
+
+    except Exception as error:
+        print(f"Error during checking if record exists in database: {error}")
+    finally: 
+        if conn:
+            cur.close()
+            conn.close()
+
+
+def check_if_price_changed(offer_data):
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+
+        if conn is None:
+            print("Connection to the databas failed")
+            return
+        cur=conn.cursor()
+
+        if_changed_query = """
+            SELECT id, updated_price
+            FROM apartments_sale_listings
+            WHERE otodom_listing_id = %s
+            ;"""
+
+        id_otodom = offer_data.get('listing_id')
+        new_price = offer_data.get('price')
+        new_price_per_m = offer_data.get('price_per_m')
+        if_changed_values = (id_otodom, )
+        cur.execute(if_changed_query, if_changed_values)
+        result = cur.fetchone()
+        id_db, old_price = result
+
+        print(f"\nid_otodom: {id_db}  new_price: {new_price}   new_price_per_m: {new_price_per_m} ")
+        print(f"id_db: {id_db}  old_price: {old_price}")
+        
+        if old_price == new_price:
+            print(f"Oferta {id_otodom} ({id_db}): Cena {old_price} jest aktualna\n")
+            return id_db, False, False
+        else:
+            print(f"Oferta {id_otodom} ({id_db}): Cena {old_price} nieaktualna, nowa cena: {new_price}\n")
+            return id_db, new_price, new_price_per_m
+
+    except Exception as error:
+        print(f"Error during checking if price changed: {error}")
+    finally:
+        conn.close()
+        cur.close()
+
+
+def categorize_offers_for_db(offers_data):
+    """ 
+    przyjmuje all_offers z download_data_from_search_results() i dzieli je na:
+    - takie, których nie ma w bazie ( -> przesyłane do scrape_all_pages() (bd trzeba zmienic nazwe))
+    - takie, które są w bazie ale zmienila sie cena ( -> -> przesyłane do update_offers() )
+    - takie, z którymi nie trzeba nic robić, ich nie zapisujemy bo nei sa potrzebne ( -> zostawiamy)
+    """
+    need_update_offers = []
+    new_offers = []
+
+    n=0
+    for offer in offers_data:
+        if not check_if_offer_exists(offer):
+            new_offers.append(offer)
+        else:
+            id, new_price, new_price_per_m = check_if_price_changed(offer)
+            if new_price: #jezeli jest to jakas liczba
+                need_update_offers.append({"id": id, "new_price": new_price, "new_price_per_m": new_price_per_m})
+            if not new_price:
+                n+=1
+    print(f"\nZnaleziono {n} ofert, które juz są w bazie i nie wymagają update ceny")
+
+    return need_update_offers, new_offers
 
 
 def download_data_from_listing_page(html_response:requests.Response) -> dict:

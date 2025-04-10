@@ -3,7 +3,7 @@ from urllib.robotparser import RobotFileParser
 from scraper.utils import save_data_to_excel
 from bs4 import BeautifulSoup
 
-from scraper.fetch_and_parse import fetch_page, download_data_from_search_results, download_data_from_listing_page
+from scraper.fetch_and_parse import fetch_page, download_data_from_search_results, download_data_from_listing_page, categorize_offers_for_db
 from scraper.transform_data import transform_data
 
 url_main = "https://www.otodom.pl/pl/wyniki/sprzedaz/mieszkanie/slaskie/katowice?by=LATEST&direction=DESC"
@@ -37,20 +37,18 @@ def scrape_all_pages_to_excel(url=url_main): # Not in use, left just in case
         cleaned_offer_data = transform_data(offer_data)
         cleaned_offer_data.pop('images')
         save_data_to_excel(cleaned_offer_data, 'output_data/data_katowice.xlsx')
+        
 
-
-def scrape_all_pages(url=url_main):
+def scrape_offers(offers_to_insert):
+    """
+    Przekazywane sa tutaj oferty, których jeszcze nie ma w bazie
+    """
     try:
-        all_offers_basic = download_data_from_search_results(url)
-
-        print('-' * 40)
-        print(f"Liczba znalezionych ofert: {len(all_offers_basic)}")
-        print('-' * 40)
-        print("Rozpoczynanie pobierania znalezionych ofert:")
+        print("Rozpoczynanie pobierania znalezionych nowych ofert:")
 
         offers_data = []
         n=1
-        for offer in all_offers_basic[25:30]:
+        for offer in offers_to_insert:
             offer_url = offer.get("link")
             id = offer.get("listing_id")
 
@@ -60,81 +58,27 @@ def scrape_all_pages(url=url_main):
             cleaned_offer_data = transform_data(offer_data)
             offers_data.append(cleaned_offer_data)
             n+=1 
+        print("Zakończono pobieranie ofert")
 
         return offers_data
     except Exception as error:
         print(f"Error during scraping all pages: {error}")
 
 
-"""
-DO USUNIECIA:
-all_offers_basic = []
-def scrape_all_pages2(url=url_main):
-    try:
-        response_page_count = fetch_page(url)
-        page_count = get_total_pages(response_page_count)
+def scrape_all_pages(url):
+    all_offers_basic = download_data_from_search_results(url)
+    print('-' * 40)
+    print(f"Liczba znalezionych ofert: {len(all_offers_basic)}")
+    print('-' * 40)
 
-        for page in range(1, 10): #page_count
-            # zbieramy ogłoszenia ze wszystkich stron
-            page_link = f"{url}&page={page}"
+    need_update_offers, new_offers = categorize_offers_for_db(all_offers_basic)
 
-            print(f"Pobieranie strony {page}")
-            response = fetch_page(page_link)
-            basic_info_offers = download_data_from_searching_page(response)
+    print(f"Nowych ofert:{len(new_offers)}")
+    print(f"Ofert, w których zmieniła się cena i wymagają update:{len(need_update_offers)}")
 
-            all_offers_basic.extend(basic_info_offers) 
+    new_offers_to_database = scrape_offers(new_offers)
 
-        print('-'*40)
-        print(f"Pobrano dane z {page_count} stron, liczba znalezionych ofert: {len(all_offers_basic)}")
-        print('-'*40)
+    return need_update_offers, new_offers_to_database
 
-        print("Rozpoczynanie pobierania znalezionych ofert:")
-        
-        n=0
-        for offer in all_offers_basic[45:47]:
-            link_offer = offer.get("link")
-            id = offer.get("listing_id")
-            response = fetch_page(link_offer)
-            print("-------------------")
-            offer_data = download_data_from_listing_page(response)
-            print(f"Pobrano ofertę o id {id}")
-            cleaned_offer_data = transform_data(offer_data)
-            offers_data.append(cleaned_offer_data)
-            n+=1
-        return offers_data
-    except Exception as error:
-        print(f"Error during scraping pages: {error}")
-
-
-offers_data = []
-def scrape_all_pages1(url=url_main):
-    response = fetch_page(url)
-    offers = download_data_from_searching_page(response)
-    
-    print(f"\nZnaleziono: {len(offers)} ofert\n")
-    n=0
-    for offer in offers[:2]:
-        link_offer = offer.get("link")
-        id = offer.get("listing_id")
-        response = fetch_page(link_offer)
-        print("-------------------")
-        offer_data = download_data_from_listing_page(response)
-        print(f"Pobrano ofertę o id {id}")
-        cleaned_offer_data = transform_data(offer_data)
-        offers_data.append(cleaned_offer_data)
-        n+=1
-    return offers_data"""
-
-# FUNKCJA sprawdzajaca czy pobrana oferta juz istnieje w bazie (na podstawie id oferty i metrazu) 
-
-# jezeli istnieje juz w bazie to sprawdz czy cena jest taka sama
-
-# jezeli cena jest taka sama to nie rob nic, jezeli inna to update ceny 
-
-# FUNCKJA updateowania ofert 
-
-#scrape_all_page_to_excel()
-#data = scrape_all_pages()
-#insert_new_listing(data)    
 
 

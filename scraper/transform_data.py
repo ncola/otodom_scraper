@@ -1,4 +1,3 @@
-import pandas as pd
 import re
 from datetime import datetime
 
@@ -18,22 +17,53 @@ FLOOR_MAPPING = {
     "['floor_higher_10']": "10+"
 }
 
+
 OWNERSHIP_MAPPING = {
     "pełna własność": "full_ownership",
     "spółdzielcze wł. prawo do lokalu": "cooperative_ownership",
 }
 
-def clear_floor_num(data):
+
+def clear_floor_num(data:str) ->str:
+    """
+    Maps the floor number from the given input data to a standard value using FLOOR_MAPPING
+    """
+    if data is None:
+        return None
     return FLOOR_MAPPING.get(data, None)
 
-def simplify_ownership(data):
+
+def simplify_ownership(data: str) -> str:
+    """     
+    Simplifies the ownership status of a property using the OWNERSHIP_MAPPING
+    """
+    if data is None:
+        return None
     return OWNERSHIP_MAPPING.get(data, None)
 
-def extract_rooms_num(val):
-    match = re.search(r'\d+', str(val))
+
+def extract_rooms_num(data: str) -> int:
+    """
+    Extracts the number of rooms from a string. It looks for the first numeric value in the string
+    """
+    if data is None:
+        return None
+    match = re.search(r'\d+', str(data))
     return int(match.group()) if match else None
 
-def extract_text(data):
+
+def extract_text(data) -> str:
+    """
+    Extracts and cleans text from the given data. If the data is a list, it joins the list into a string
+    
+    Args:
+    data: The input data (can be a string or a list of strings)
+
+    Returns:
+    str: The cleaned text or None if the input data is None
+
+    If the input data is a list, the function joins the elements into a single string and removes unwanted characters
+    """
     if data is None:
         return None
     if isinstance(data, list):
@@ -42,14 +72,32 @@ def extract_text(data):
         clean = data.strip("[]',")
     return clean
 
-def clear_numbers(data, val='int'):
+
+def clear_numbers(data, val:str='int'):
+    """
+    Converts the given data to either an integer or a float based on the specified value type
+
+    Args:
+    data: The data to be converted (should be a numeric string or a number)
+    val (str): The type to convert to. Defaults to 'int'. Can also be 'float'
+
+    Returns:
+    int or float: The converted data (either as an integer or a float), or None if the input data is None
+
+    If the value type is 'int', the function converts the data to an integer
+    If the value type is 'float', the function converts the data to a float
+    """
     if data is not None:
         if val == 'int':
             return int(data)
         elif val == 'float':
             return float(data)
 
-def clean_text(text):
+
+def clean_text(text: str) -> str:
+    """     
+    Cleans the given text by removing unwanted characters, extra spaces, and line breaks
+    """
     if text is None:
         return None
     text = text.replace("\n", " ") 
@@ -58,7 +106,23 @@ def clean_text(text):
     return text
 
 
-def transform_data(data):
+def transform_data(data: dict) -> dict:
+    """
+    Transforms the input data by cleaning, simplifying, and formatting it to a standardized structure
+
+    Args:
+    data (dict): The data dictionary containing information about a property listing.
+
+    Returns:
+    dict: The transformed data dictionary with cleaned and simplified values.
+
+    This function processes various fields in the input data, such as:
+    - Extracting the number of rooms,
+    - Mapping the floor number and ownership status to simplified values,
+    - Cleaning text fields,
+    - Combining features into one field,
+    - Formatting price, area, and date values,
+    """
     transformed_data = data.copy()
 
     transformed_data["rooms_num"] = extract_rooms_num(transformed_data.get("rooms_num"))

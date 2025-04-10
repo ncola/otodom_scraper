@@ -23,7 +23,7 @@ def get_db_connection():
             password=os.getenv('DB_PASSWORD'),
             port=os.getenv('DB_PORT')
         )
-        print(f"Connected to database {os.getenv('DB_NAME')}")
+        #print(f"Connected to database {os.getenv('DB_NAME')}")
         return connection
     except Exception as error:
         print(f"Error while connecting to database: {error}")
