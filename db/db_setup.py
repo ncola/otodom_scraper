@@ -14,6 +14,20 @@ load_dotenv()
 
 # ustawienie połączenia z bazą danych 
 def get_db_connection():
+    """
+    Establishes a connection to the PostgreSQL database using credentials from environment variables
+    
+    Reads the database connection settings from the environment variables
+    (DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_PORT) and uses them to establish a 
+    connection to the PostgreSQL 
+
+    Returns:
+        connection: psycopg2 connection object, or None if connection fails
+
+    Raises:
+        Exception: If there is an error during connection setup
+    """
+
     connection = None
     try:
         connection = psycopg2.connect(
@@ -23,18 +37,27 @@ def get_db_connection():
             password=os.getenv('DB_PASSWORD'),
             port=os.getenv('DB_PORT')
         )
-        #print(f"Connected to database {os.getenv('DB_NAME')}")
+        print(f"Connected to database {os.getenv('DB_NAME')}")
         return connection
     except Exception as error:
         print(f"Error while connecting to database: {error}")
     return connection
 
 
-
 # Utworzenie tabel
-def create_tables():
-    conn = None
-    cur = None  
+def create_tables(cur):
+    """
+    Creates the necessary tables for storing apartment listings, price history, photos, and features in the database
+    
+    This function checks if the required tables (`locations`, `apartments_sale_listings`, `price_history`, 
+    `photos`, `features`) already exist in the database. If they do not exist, it reads SQL commands from a 
+    file (db/schema.sql) and executes them to create the tables
+
+    The schema.sql file should contain the SQL scripts for creating these tables
+
+    Raises:
+        Exception: If an error occurs during the table creation process
+    """
     try:
         conn = get_db_connection()
         if conn is None:
@@ -75,10 +98,5 @@ def create_tables():
                 print(f"Error during creating tables: {error}")
 
     except Exception as error:
-        print(f"Error 2: {error}")
-    finally:
-        if cur is not None:
-            cur.close()
-        if conn is not None:
-            conn.close()
-    
+        print(f"Error during creating tables in database: {error}")
+

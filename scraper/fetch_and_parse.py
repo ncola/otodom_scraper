@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import requests, cv2, json, time, random
 from bs4 import BeautifulSoup
 import numpy as np
@@ -6,34 +10,44 @@ from db.db_operations import get_db_connection
 
 def fetch_page(url: str) -> requests.Response:
     """
-    Fetches the content of a webpage in Polish language.
+    Fetches the content of a webpage.
 
     A delay (random sleep) is added between requests to avoid being blocked by the server due to
     making too many requests in a short period
 
+    The function sends a GET request to the specified URL with custom headers (including Polish 
+    language preference). If the request is successful (status code 200), the response object 
+    is returned. If the request fails (e.g. returns an error status code or raises a network-related 
+    exception), an error message is printed and None is returned
+
     Args:
-    url (str): The URL of the page to fetch.
+    url (str): The URL of the page to fetch
 
     Returns:
-    requests.Response: The HTTP response object containing the content of the page.
+    requests.Response: The HTTP response object containing the content of the page
 
     If the request is successful (status code 200), it returns the response object.
     Otherwise, it prints an error message with the status code and returns None.
     """
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
-        "Accept-Language": "pl-PL,pl;q=0.9"
-    }
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Accept-Language": "pl-PL,pl;q=0.9"
+        }
 
-    response = requests.get(url, headers=headers)
-    time.sleep(random.uniform(1, 3))
+        html_response = requests.get(url, headers=headers)
+        time.sleep(random.uniform(1,2))
 
-    if response.status_code == 200:
-        return response
-    else: 
-        print(f"Wystąpił błąd: {response.status_code}")
+        if html_response.status_code == 200:
+            return html_response
+        else: 
+            print(f"Wystąpił błąd podczas pobierania strony: {html_response.status_code}")
+            return None
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Wyjątek przy pobieraniu strony: {e}")
         return None
 
 
@@ -86,71 +100,100 @@ def download_data_from_search_results(base_url: str) -> list:
 
     Returns:
         list: A list of dictionaries, each containing:
-            - listing_id (int): listing ID from otodom
-            - area (float): area of the apartment in m2
-            - price (int): Total price 
-            - price_per_m (float): Price per m2
-            - link (str): URL to the individual listing
+            - listing_id (int): listing ID from otodom or None
+            - area (float): area of the apartment in m2 or 0
+            - price (int): Total price  or None
+            - price_per_m (float): Price per m2 or None
+            - link (str): URL to the individual listing or None
 
     Raises:
-        Exception: If the first page fails to load or parsing fails due to missing script tag.
+        Exception: If the first page fails to load, or if parsing fails due to a missing or incorrect script tag
+        ValueError: If the script tag does not contain the expected data structure
     """
-    all_offers = []
-
-    response_first_page = fetch_page(base_url)
-    if response_first_page is None:
-        raise Exception("Nie udało się pobrać pierwszej strony wyszukiwania, sprawdź URL.")
-
-    page_count = get_total_pages(response_first_page)
-    
-    for page in range(1, page_count+1):
-        page_url = f"{base_url}&page={page}"
-        print(f"Pobieranie strony {page} z {page_count}")
-        
-        response = fetch_page(page_url)
-        if response is None:
-            print(f"Nie udało się pobrać strony {page}.")
-            continue
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-        script_tag = soup.find('script', {'id': '__NEXT_DATA__'}) 
-
-        if not script_tag:
-            print(f"Błąd przy stronie {page}: brak skryptu z danymi")
-            continue
-
-        json_data = json.loads(script_tag.string)
-        offers = json_data.get("props", {}).get("pageProps", {}).get("data", {}).get("searchAds", {}).get("items", [])
-
-        for offer in offers:
-            listing_id = offer.get("id")
-            area = offer.get("areaInSquareMeters", 0)
-            total_price = offer.get("totalPrice", {})
-            price = total_price.get("value", "Brak ceny") if isinstance(total_price, dict) else "Brak ceny"
-            price_per_m = offer.get("pricePerSquareMeter", {}).get("value", "Brak ceny za m2")
-            link = f"https://www.otodom.pl/pl/oferta/{offer.get('slug', 'Brak linku')}"
-            
-            all_offers.append({
-                'listing_id': listing_id,
-                'area': area,
-                'price': price,
-                'price_per_m': price_per_m,
-                'link': link
-            })
-
-    return all_offers
-
-
-def check_if_offer_exists(offer_data):
-    conn = None
-    cur = None
     try:
-        conn = get_db_connection()
-        if conn is None:
-            print("Connection to the databas failed")
-            return
-        cur=conn.cursor()
+        all_offers = []
+
+        response_first_page = fetch_page(base_url)
+        if response_first_page is None:
+            raise Exception("Nie udało się pobrać pierwszej strony wyszukiwania, sprawdź URL.")
+
+        page_count = get_total_pages(response_first_page)
+        print(f"Liczba znalezionych stron: {page_count}")
         
+        for page in range(1, page_count+1):
+            page_url = f"{base_url}&page={page}"
+            print(f"Pobieranie strony {page} z {page_count} ({page_url})")
+            
+            html_response = fetch_page(page_url)
+            if html_response is None:
+                print(f"Nie udało się pobrać strony {page}.")
+                continue
+
+            soup = BeautifulSoup(html_response.text, 'html.parser')
+            script_tag = soup.find('script', {'id': '__NEXT_DATA__'}) 
+
+            if not script_tag:
+                print(f"Błąd przy stronie {page}: brak skryptu z danymi")
+                continue
+
+            json_data = json.loads(script_tag.string)
+            offers = json_data.get("props", {}).get("pageProps", {}).get("data", {}).get("searchAds", {}).get("items", [])
+            
+            if not offers:
+                print(f"Brak ofert na stronie {page} url {base_url}.")
+                continue
+            
+            n=1
+            for offer in offers: 
+                # sprawdz czy nie jest to zbiorowe ogloszenie do ktorego nie mam obslugi
+
+                listing_id = offer.get("id")
+                area = offer.get("areaInSquareMeters", 0)
+                total_price = offer.get("totalPrice", {})
+                price = total_price.get("value", None) if isinstance(total_price, dict) else None
+                ppm_data = offer.get("pricePerSquareMeter", {})
+                if ppm_data:
+                    price_per_m = ppm_data.get("value", None)
+                else: 
+                    price_per_m = None
+                
+                link = f"https://www.otodom.pl/pl/oferta/{offer.get('slug', None)}"
+
+                print(f"{n}.id oferty z searching page: {listing_id}, link: {link}, area: {area}, price: {price}, price_per_m: {price_per_m}")
+
+                all_offers.append({
+                    'listing_id': listing_id,
+                    'area': area,
+                    'price': price,
+                    'price_per_m': price_per_m,
+                    'link': link
+                })
+                n+=1
+
+        return all_offers
+
+    except Exception as error:
+        print(f"Error during downloading data from search result: {error}")
+        
+
+def check_if_offer_exists(fetched_all_data_from_otodom: dict, cur) -> bool:
+    """
+    Checks whether a property listing already exists in the database based on its ID and area
+
+    Args:
+        fetched_all_data_from_otodom (dict): A dictionary containing offer data from Otodom, including 
+                                        'listing_id', 'area', 'price', 'price_per_m', 'link' 
+                                        (single entry from download_data_from_search_results())
+        cur (cursor): Database cursor to execute queries
+
+    Returns:
+        bool: True if the offer already exists in the database, False otherwise. If an error occurs during the query,
+        the function returns None
+    
+    Raises:
+        Exception: If database query fails or any other error occurs
+    """
+    try:
         if_exists_query = """
             SELECT id
             FROM apartments_sale_listings
@@ -158,92 +201,245 @@ def check_if_offer_exists(offer_data):
             LIMIT 1
             ;"""
         
-        id = offer_data.get('listing_id')
-        area = offer_data.get('area')
+        id = fetched_all_data_from_otodom.get('listing_id')
+        area = fetched_all_data_from_otodom.get('area')
         if_exists_values = (id, area)
 
         cur.execute(if_exists_query, if_exists_values)
         result = cur.fetchone()
         if result is None:
-            print(f"Oferta {id} o metrazu {area} nie istnieje w bazie")
+            print(f"Oferta {id} o metrazu {area} nie istnieje w bazie ")
             return False
         else:
-            print(f"Oferta {id} o metrazu {area} istnieje w bazie pod id: {result}")
+            print(f"Oferta {id} o metrazu {area} istnieje w bazie pod id: {result} !!!!!!!!!!!!!!!!!!!!!!!!!!")
             return True
 
     except Exception as error:
         print(f"Error during checking if record exists in database: {error}")
-    finally: 
-        if conn:
-            cur.close()
-            conn.close()
 
 
-def check_if_price_changed(offer_data):
-    conn = None
-    cur = None
+def check_if_price_changed(fetched_data_from_otodom: dict, cur) -> tuple:
+    """
+    Checks if the price of a given offer (that is already in database) has changed
+
+    Args:
+        fetched_data_from_otodom (dict): A dictionary containing offer data from Otodom, including 
+                                        'listing_id' and 'area', 'price', 'price_per_m', 'link' 
+                                        (single entry from download_data_from_search_results())
+        cur (cursor): Database cursor to execute SQL queries
+
+    Returns:
+        tuple: (id, bool) - id (the one from db) of the listing and a boolean indicating if the price 
+        has changed
+    """
     try:
-        conn = get_db_connection()
-
-        if conn is None:
-            print("Connection to the databas failed")
-            return
-        cur=conn.cursor()
-
         if_changed_query = """
             SELECT id, updated_price
             FROM apartments_sale_listings
             WHERE otodom_listing_id = %s
             ;"""
 
-        id_otodom = offer_data.get('listing_id')
-        new_price = offer_data.get('price')
-        new_price_per_m = offer_data.get('price_per_m')
+        id_otodom = fetched_data_from_otodom.get('listing_id')
+        new_price = fetched_data_from_otodom.get('price')
+        new_price_per_m = fetched_data_from_otodom.get('price_per_m')
         if_changed_values = (id_otodom, )
         cur.execute(if_changed_query, if_changed_values)
         result = cur.fetchone()
         id_db, old_price = result
 
-        print(f"\nid_otodom: {id_db}  new_price: {new_price}   new_price_per_m: {new_price_per_m} ")
-        print(f"id_db: {id_db}  old_price: {old_price}")
+        print(f"    id_otodom: {id_db}  new_price: {new_price}   new_price_per_m: {new_price_per_m} ")
+        print(f"    id_db: {id_db}  old_price: {old_price}")
         
         if old_price == new_price:
-            print(f"Oferta {id_otodom} ({id_db}): Cena {old_price} jest aktualna\n")
-            return id_db, False, False
+            print(f"Oferta {id_otodom} ({id_db}): Cena {old_price} jest aktualna")
+            return id_db, False
         else:
-            print(f"Oferta {id_otodom} ({id_db}): Cena {old_price} nieaktualna, nowa cena: {new_price}\n")
-            return id_db, new_price, new_price_per_m
+            print(f"Oferta {id_otodom} ({id_db}): Cena {old_price} nieaktualna, nowa cena: {new_price}")
+            return id_db, new_price
 
     except Exception as error:
         print(f"Error during checking if price changed: {error}")
-    finally:
-        conn.close()
-        cur.close()
+        
+
+def find_potentially_deleted_offers(fetched_all_data_from_otodom: list, city:str, cur) -> set: 
+    """
+    Checks if all active offers (from the same city which used in searching) from the database exist 
+    in the current set of fetched offers.
+    Will be used in check_offer_status()
+
+    Args:
+        fetched_all_data_from_otodom (list): List of dictionaries containing offer data from Otodom, including 
+                                        'listing_id' and 'area', 'price', 'price_per_m', 'link' 
+                                        (all data from download_data_from_search_results())
+        city (str): City for which we are looking for apartments for sale
+        cur (cursor): Database cursor to execute SQL queries
+
+    Returns:
+        set: A set of potentially deleted offer IDs from the database
+    """
+    
+    # Sprawdź, czy wszytskie aktywne ID z bazy znajdują się w swiezo zebranych danych z całego wyszukiwania z danego miasta
+    all_offers_from_db_query = """
+        SELECT asl.id, asl.otodom_listing_id, asl.area
+        FROM apartments_sale_listings asl
+        JOIN locations l ON asl.location_id = l.id
+        WHERE asl.active IS TRUE
+        AND l.city = %s
+        ;"""
+    
+    cur.execute(all_offers_from_db_query, (city.lower(),))
+    all_offers_from_db = cur.fetchall()
+
+    data_from_otodom = set()
+    for offer_dict in  fetched_all_data_from_otodom:
+        id_otodom_from_otodom= offer_dict["listing_id"]
+        area_from_otodom = offer_dict["area"]
+        offer_data = (id_otodom_from_otodom, area_from_otodom)
+        data_from_otodom.add(offer_data)
+
+    potentially_deleted = set()
+    for id_db, id_otodom_from_db, area_from_db in all_offers_from_db:
+        if (id_otodom_from_db, area_from_db) not in data_from_otodom:
+            potentially_deleted.add(id_db)
+
+    print(f"Potencjalnie {len(potentially_deleted)} usuniętych ofert. ID tych ofert: {potentially_deleted}")
+
+    return potentially_deleted # set ID (to przypisane w bazie, a nie to z otodom), które mogły zostać usunięte (są w bazie danych ale nie ma ich w  pobranych danych z wyszukiwania)
 
 
-def categorize_offers_for_db(offers_data):
+def find_offer_link(potentially_deleted_data: set, cur) -> set:
+    """
+    Retrieves the links for potentially deleted offers
+
+    Args:
+        potentially_deleted_data (set): A set of potentially deleted offer IDs (from find_potentially_deleted_offers())
+        cur (cursor): Database cursor to execute SQL queries
+
+    Returns:
+        set: A set of tuples containing (offer_id_from_db, offer_link)
+
+    """
+    check_potentially_deleted_query = """
+        SELECT offer_link
+        FROM apartments_sale_listings
+        WHERE id = %s
+        ;"""
+
+    links=set()
+    for id_from_db in potentially_deleted_data:
+        
+        cur.execute(check_potentially_deleted_query, (id_from_db,))
+        offer_link = cur.fetchone()[0]
+
+        links.add((id_from_db, offer_link))
+
+    print(links)
+    return links #
+
+
+def get_offer_status(offer_link: str) ->str:
+    """
+    Checks the status of a given offer on Otodom
+
+    Args:
+        offer_link (str): The URL of the offer to check
+
+    Returns:
+        str: The status of the offer (e.g., "active", "removed")
+    """
+    try:
+        print(f"{offer_link} status:")
+        html_response = fetch_page(offer_link)
+        if html_response is None:
+            return "removed"
+
+        soup = BeautifulSoup(html_response.text, 'html.parser')
+        script_tag = soup.find('script', {'id': '__NEXT_DATA__'}) 
+        if script_tag: 
+            json_data = json.loads(script_tag.string)
+            status = json_data.get("props", {}).get("pageProps", {}).get("ad", {}).get("status", None)
+            print(status)
+            return status
+    except Exception as error:
+        print(f"Error during getting offer status: {error}")
+
+
+def find_closed_offers(data:list, city:str, cur) ->set:
+    """
+    Finds the offers that have been closed or removed
+
+    Args:
+        data (list): List of dictionaries containing offer data from Otodom, including 'listing_id', 
+        'area', 'price', 'price_per_m', 'link' (all data from download_data_from_search_results())
+        city (str): City for which we are looking for apartments for sale 
+        cur (cursor): Database cursor to execute SQL queries
+
+    Returns:
+        set: A set of tuples containing (offer_id_from_db, offer_status) for closed offers
+    """
+
+    try:
+        # 1. Na podstawie bazy i pobranych wlasnie danych z wyszukiwania otodom okreslamy ID ofert ktore mogly zostac usuniete
+        potentially_deleted = find_potentially_deleted_offers(data, city, cur) #set (1. ID do sprawdzenia czy są aktywne)
+        
+        # 2. Do listy ID potencjalnie usunietcyh ofert dodajemy ich linki
+        potentially_deleted_links = find_offer_link(potentially_deleted, cur)  # set krotek (1. id (to nadane w bazie) potecnjalnie usunietych z otodom ofert, 2. link do oferty)
+        
+        # 3. Wchodzimy w kazdy link i sprawdzamy status oferty
+        deleted_offers = set()
+        for id_from_db, offer_link in potentially_deleted_links:
+            status = get_offer_status(offer_link)
+            if 'active' not in status:
+                deleted_offers.add((id_from_db, status))
+
+        print(f"Oferty usuniete: {deleted_offers}")
+        return deleted_offers #set krotek(1. ID (nadane w bazie), 2. status ofert, które zostały usunięte z otodom)
+
+    except Exception as error:
+        print(f"Error during finding closed offers: {error}")
+
+
+
+def categorize_offers_for_db(offers_data): #jednak NOT IN USE LEFT IN CASE
     """ 
     przyjmuje all_offers z download_data_from_search_results() i dzieli je na:
     - takie, których nie ma w bazie ( -> przesyłane do scrape_all_pages() (bd trzeba zmienic nazwe))
     - takie, które są w bazie ale zmienila sie cena ( -> -> przesyłane do update_offers() )
     - takie, z którymi nie trzeba nic robić, ich nie zapisujemy bo nei sa potrzebne ( -> zostawiamy)
     """
-    need_update_offers = []
-    new_offers = []
+    conn = None
+    cur = None  
+    try:
+        conn = get_db_connection()
+        if conn is None:
+            print("Connection to the databas failed")
+            return
+        cur=conn.cursor()
+        need_update_offers = []
+        new_offers = []
 
-    n=0
-    for offer in offers_data:
-        if not check_if_offer_exists(offer):
-            new_offers.append(offer)
-        else:
-            id, new_price, new_price_per_m = check_if_price_changed(offer)
-            if new_price: #jezeli jest to jakas liczba
-                need_update_offers.append({"id": id, "new_price": new_price, "new_price_per_m": new_price_per_m})
-            if not new_price:
-                n+=1
-    print(f"\nZnaleziono {n} ofert, które juz są w bazie i nie wymagają update ceny")
+        n=0
+        for offer in offers_data:
+            if not check_if_offer_exists(offer, cur):
+                new_offers.append(offer)
+            else:
+                id, new_price, new_price_per_m = check_if_price_changed(offer, cur)
+                if new_price: #jezeli jest to jakas liczba
+                    need_update_offers.append({"id": id, "new_price": new_price, "new_price_per_m": new_price_per_m})
+                if not new_price:
+                    n+=1
+        print(f"\nZnaleziono {n} ofert, które juz są w bazie i nie wymagają update ceny")
 
-    return need_update_offers, new_offers
+        # new_offers to lista słowników tak jak w danych wejściwoych czyli wynik download_data_from_search_results()
+        # need_update_offers to lista słowników z wartsociami id, new_price i new_price_per_m
+
+        return need_update_offers, new_offers
+    except Exception as error:
+        print(f"Error during categorizing offers for db: {error}")
+    finally: 
+        if conn:
+            cur.close()
+            conn.close()
 
 
 def download_data_from_listing_page(html_response:requests.Response) -> dict:
@@ -301,12 +497,12 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
         building_material = str(target.get("Building_material", None))
 
         characteristics = offer_data.get("characteristics", {})        
+        ownership = None
         for characteristic in characteristics:
             if characteristic["key"] == "building_ownership":
-                ownership = characteristic.get("localizedValue", None) # ownership (Własność); cooperative_ownership (Spółdzielcze własnościowe prawo do lokalu); land_ownership (Własność gruntu); state_ownership (Własność państwowa); municipal_ownership (Własność komunalna)
-            else:
-                ownership = None
-        
+                ownership = characteristic.get("localizedValue", None)  # ownership (Własność); cooperative_ownership (Spółdzielcze własnościowe prawo do lokalu); land_ownership (Własność gruntu); state_ownership (Własność państwowa); municipal_ownership (Własność komunalna)
+                break
+
         building_type = str(target.get("Building_type", None))
         energy_certificate = target.get("Energy_certificate", None)        
         city = target.get("City", None)

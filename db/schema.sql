@@ -37,7 +37,6 @@ CREATE TABLE apartments_sale_listings (
     building_material TEXT,  -- Materiał budynku
     building_type TEXT,  -- Typ budynku
     windows_type TEXT,  -- Rodzaj okien
-    security_types TEXT,  -- Typy zabezpieczeń budynku (np domofon, ochrona, monitoring)
     local_plan_url TEXT,  -- URL do planu lokalnego
     video_url TEXT,  -- URL do wideo
     view3d_url TEXT,  -- URL do widoku 3D
