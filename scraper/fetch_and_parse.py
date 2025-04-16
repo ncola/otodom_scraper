@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import requests, cv2, json, time, random
+import requests, cv2, json, time, random, logging
 from bs4 import BeautifulSoup
 import numpy as np
 from db.db_operations import get_db_connection
@@ -43,11 +43,11 @@ def fetch_page(url: str) -> requests.Response:
         if html_response.status_code == 200:
             return html_response
         else: 
-            print(f"Wystąpił błąd podczas pobierania strony: {html_response.status_code}")
+            logging.error(f"Błąd HTTP podczas pobierania strony ({url}): {html_response.status_code}")
             return None
         
     except requests.exceptions.RequestException as e:
-        print(f"Wyjątek przy pobieraniu strony: {e}")
+        logging.exception(f"Wyjątek przy pobieraniu strony: {e}")
         return None
 
 
@@ -69,6 +69,7 @@ def get_total_pages(html_response: requests.Response) ->int:
     """
     try:
         if html_response is None:
+            logging.error("Wystąpił błąd w pobraniu danych ze strony")
             raise Exception(f"Wystąpił błąd w pobraniu danych ze strony")
         
         soup = BeautifulSoup(html_response.text, 'html.parser')
@@ -80,11 +81,13 @@ def get_total_pages(html_response: requests.Response) ->int:
             #result_count = json_data.get("result_count", {})
             #results_per_page = json_data.get("results_per_page", {})
             
-            print(f"Liczba stron dla danego wyszukiwania: {page_count}")
             return page_count
         
+        logging.warning("Nie udało się znaleźć tagu z danymi dla liczby stron")
+        return 0
+        
     except Exception as error:
-        print(f"Error during getting total pages: {error}")
+        logging.exception(f"Error during getting total pages: {error}")
 
 
 def download_data_from_search_results(base_url: str) -> list:
@@ -115,40 +118,43 @@ def download_data_from_search_results(base_url: str) -> list:
 
         response_first_page = fetch_page(base_url)
         if response_first_page is None:
-            raise Exception("Nie udało się pobrać pierwszej strony wyszukiwania, sprawdź URL.")
+            logging.error("Nie udało się pobrać pierwszej strony wyszukiwania, sprawdź URL")
+            raise Exception("Nie udało się pobrać pierwszej strony wyszukiwania, sprawdź URL")
 
         page_count = get_total_pages(response_first_page)
-        print(f"Liczba znalezionych stron: {page_count}")
+        logging.info(f"Liczba znalezionych stron: {page_count}")
         
         for page in range(1, page_count+1):
             page_url = f"{base_url}&page={page}"
-            print(f"Pobieranie strony {page} z {page_count} ({page_url})")
+            logging.debug(f"Pobieranie strony {page} z {page_count} ({page_url})")
             
             html_response = fetch_page(page_url)
             if html_response is None:
-                print(f"Nie udało się pobrać strony {page}.")
+                logging.exception(f"Nie udało się pobrać strony {page}.")
                 continue
 
             soup = BeautifulSoup(html_response.text, 'html.parser')
             script_tag = soup.find('script', {'id': '__NEXT_DATA__'}) 
 
             if not script_tag:
-                print(f"Błąd przy stronie {page}: brak skryptu z danymi")
+                logging.exception(f"Błąd przy stronie {page}: brak skryptu z danymi")
                 continue
 
             json_data = json.loads(script_tag.string)
             offers = json_data.get("props", {}).get("pageProps", {}).get("data", {}).get("searchAds", {}).get("items", [])
             
             if not offers:
-                print(f"Brak ofert na stronie {page} url {base_url}.")
+                logging.exception(f"Brak ofert na stronie {page} url {base_url}")
                 continue
             
+            logging.debug(f"Liczba znalezionych ofert na stronie {page}: {len(offers)}")
+
             n=1
             for offer in offers: 
                 # sprawdz czy nie jest to zbiorowe ogloszenie do ktorego nie mam obslugi
 
                 listing_id = offer.get("id")
-                area = offer.get("areaInSquareMeters", 0)
+                area = round(float(offer.get("areaInSquareMeters", 0)),2)
                 total_price = offer.get("totalPrice", {})
                 price = total_price.get("value", None) if isinstance(total_price, dict) else None
                 ppm_data = offer.get("pricePerSquareMeter", {})
@@ -159,7 +165,7 @@ def download_data_from_search_results(base_url: str) -> list:
                 
                 link = f"https://www.otodom.pl/pl/oferta/{offer.get('slug', None)}"
 
-                print(f"{n}.id oferty z searching page: {listing_id}, link: {link}, area: {area}, price: {price}, price_per_m: {price_per_m}")
+                logging.debug(f"{n}.id oferty z searching page: {listing_id}, area: {area}, price: {price}, price_per_m: {price_per_m}, link: {link}")
 
                 all_offers.append({
                     'listing_id': listing_id,
@@ -173,7 +179,7 @@ def download_data_from_search_results(base_url: str) -> list:
         return all_offers
 
     except Exception as error:
-        print(f"Error during downloading data from search result: {error}")
+        logging.exception(f"Error during downloading data from search result: {error}")
         
 
 def check_if_offer_exists(fetched_all_data_from_otodom: dict, cur) -> bool:
@@ -208,14 +214,15 @@ def check_if_offer_exists(fetched_all_data_from_otodom: dict, cur) -> bool:
         cur.execute(if_exists_query, if_exists_values)
         result = cur.fetchone()
         if result is None:
-            print(f"Oferta {id} o metrazu {area} nie istnieje w bazie ")
+            logging.debug(f"Oferta {id} o metrazu {area} NIE istnieje w bazie (result: {result}), pobieramy")
             return False
         else:
-            print(f"Oferta {id} o metrazu {area} istnieje w bazie pod id: {result} !!!!!!!!!!!!!!!!!!!!!!!!!!")
+            logging.debug(f"Oferta {id} o metrazu {area} istnieje w bazie pod id: {result} , sprawdzamy dalej !!!!!!!!!!!!!!!!!!!!!!!!!!")
             return True
 
     except Exception as error:
-        print(f"Error during checking if record exists in database: {error}")
+        logging.exception(f"Error during checking if record exists in database: {error}")
+        return None
 
 
 def check_if_price_changed(fetched_data_from_otodom: dict, cur) -> tuple:
@@ -247,18 +254,18 @@ def check_if_price_changed(fetched_data_from_otodom: dict, cur) -> tuple:
         result = cur.fetchone()
         id_db, old_price = result
 
-        print(f"    id_otodom: {id_db}  new_price: {new_price}   new_price_per_m: {new_price_per_m} ")
-        print(f"    id_db: {id_db}  old_price: {old_price}")
+        logging.debug(f"    Dla id {id_otodom}  na stronie cena wynosi {new_price} (cena za m2: {new_price_per_m})")
+        logging.debug(f"    W bazie ta oferta ma id: {id_db}  ma zapisaną cenę {old_price}\n")
         
         if old_price == new_price:
-            print(f"Oferta {id_otodom} ({id_db}): Cena {old_price} jest aktualna")
+            logging.info(f"W ofercie {id_otodom} ({id_db}) cena {old_price} jest aktualna")
             return id_db, False
         else:
-            print(f"Oferta {id_otodom} ({id_db}): Cena {old_price} nieaktualna, nowa cena: {new_price}")
+            logging.debug(f"W ofercie {id_otodom} ({id_db}) cena {old_price} jest nieaktualna, nowa cena wynosi {new_price}\n")
             return id_db, new_price
 
     except Exception as error:
-        print(f"Error during checking if price changed: {error}")
+        logging.exception(f"Error during checking if price changed: {error}")
         
 
 def find_potentially_deleted_offers(fetched_all_data_from_otodom: list, city:str, cur) -> set: 
@@ -302,7 +309,12 @@ def find_potentially_deleted_offers(fetched_all_data_from_otodom: list, city:str
         if (id_otodom_from_db, area_from_db) not in data_from_otodom:
             potentially_deleted.add(id_db)
 
-    print(f"Potencjalnie {len(potentially_deleted)} usuniętych ofert. ID tych ofert: {potentially_deleted}")
+    logging.debug("*"*100)
+    logging.debug(f"Oferty z bazy danych: \n {all_offers_from_db}\n")
+    logging.debug(f"Oferty z otodom: \n {data_from_otodom}")
+    logging.debug("*"*100)
+
+    logging.info(f"Potencjalnie {len(potentially_deleted)} usuniętych ofert")
 
     return potentially_deleted # set ID (to przypisane w bazie, a nie to z otodom), które mogły zostać usunięte (są w bazie danych ale nie ma ich w  pobranych danych z wyszukiwania)
 
@@ -325,6 +337,7 @@ def find_offer_link(potentially_deleted_data: set, cur) -> set:
         WHERE id = %s
         ;"""
 
+    logging.debug("Potencjalnie usunięte oferty:")
     links=set()
     for id_from_db in potentially_deleted_data:
         
@@ -333,8 +346,9 @@ def find_offer_link(potentially_deleted_data: set, cur) -> set:
 
         links.add((id_from_db, offer_link))
 
-    print(links)
-    return links #
+        logging.debug(f"{id_from_db}: {offer_link}")
+
+    return links 
 
 
 def get_offer_status(offer_link: str) ->str:
@@ -348,7 +362,6 @@ def get_offer_status(offer_link: str) ->str:
         str: The status of the offer (e.g., "active", "removed")
     """
     try:
-        print(f"{offer_link} status:")
         html_response = fetch_page(offer_link)
         if html_response is None:
             return "removed"
@@ -358,10 +371,11 @@ def get_offer_status(offer_link: str) ->str:
         if script_tag: 
             json_data = json.loads(script_tag.string)
             status = json_data.get("props", {}).get("pageProps", {}).get("ad", {}).get("status", None)
-            print(status)
+            
             return status
+        
     except Exception as error:
-        print(f"Error during getting offer status: {error}")
+        logging.exception(f"Error during getting offer status: {error}")
 
 
 def find_closed_offers(data:list, city:str, cur) ->set:
@@ -382,21 +396,26 @@ def find_closed_offers(data:list, city:str, cur) ->set:
         # 1. Na podstawie bazy i pobranych wlasnie danych z wyszukiwania otodom okreslamy ID ofert ktore mogly zostac usuniete
         potentially_deleted = find_potentially_deleted_offers(data, city, cur) #set (1. ID do sprawdzenia czy są aktywne)
         
-        # 2. Do listy ID potencjalnie usunietcyh ofert dodajemy ich linki
+        # 2. Do setu ID potencjalnie usunietcyh ofert dodajemy ich linki
         potentially_deleted_links = find_offer_link(potentially_deleted, cur)  # set krotek (1. id (to nadane w bazie) potecnjalnie usunietych z otodom ofert, 2. link do oferty)
         
         # 3. Wchodzimy w kazdy link i sprawdzamy status oferty
         deleted_offers = set()
+        logging.debug("Sprawdzamy kazda potencjalnie usuniętą ofertę: \n")
         for id_from_db, offer_link in potentially_deleted_links:
+            logging.debug(f"Oferta {id_from_db}, link: {offer_link}")
             status = get_offer_status(offer_link)
+            logging.debug(f"status: {status}")
             if 'active' not in status:
                 deleted_offers.add((id_from_db, status))
+                logging.debug("Dodano do listy usuniętych ofert")
+        logging.debug("\n")   
 
-        print(f"Oferty usuniete: {deleted_offers}")
+        logging.info(f"Oferty usunięte z otodom: {deleted_offers}")
         return deleted_offers #set krotek(1. ID (nadane w bazie), 2. status ofert, które zostały usunięte z otodom)
 
     except Exception as error:
-        print(f"Error during finding closed offers: {error}")
+        logging.exception(f"Error during finding closed offers: {error}")
 
 
 

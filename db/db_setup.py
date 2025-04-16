@@ -1,4 +1,4 @@
-import psycopg2, os
+import psycopg2, os, logging
 from dotenv import load_dotenv
 
 
@@ -37,10 +37,10 @@ def get_db_connection():
             password=os.getenv('DB_PASSWORD'),
             port=os.getenv('DB_PORT')
         )
-        print(f"Connected to database {os.getenv('DB_NAME')}")
+        logging.debug(f"Connected to database {os.getenv('DB_NAME')}")
         return connection
     except Exception as error:
-        print(f"Error while connecting to database: {error}")
+        logging.debug(f"Error while connecting to database: {error}")
     return connection
 
 
@@ -61,7 +61,7 @@ def create_tables(cur):
     try:
         conn = get_db_connection()
         if conn is None:
-            print("Connection to the databas failed")
+            logging.error("Connection to the databas failed")
             return
     
         cur=conn.cursor()
@@ -93,10 +93,10 @@ def create_tables(cur):
                         cur.execute(command.strip())
                 
                 conn.commit()
-                print("Tables created")
+                logging.info(f"Tables {tables} created")
             except Exception as error:
-                print(f"Error during creating tables: {error}")
+                logging.exception(f"Error during creating tables: {error}")
 
     except Exception as error:
-        print(f"Error during creating tables in database: {error}")
+        logging.exception(f"Error during creating tables in database: {error}")
 

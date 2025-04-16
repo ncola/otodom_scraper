@@ -1,5 +1,5 @@
 from db.db_setup import get_db_connection
-import datetime
+import datetime, logging
 
 def check_location_table(cur, offer_data):
     location_query = """
@@ -24,26 +24,28 @@ def insert_into_locations_table(cur, offer_data):
     location_result = check_location_table(cur, offer_data)
     # jezeli nie istnieje to dodajemy do tabeli
     if not location_result:
-        print("Czy lokalizacja znajduje się już w locations?: NIE")
+        location_values = (offer_data['voivodeship'], 
+                           offer_data['city'], 
+                           offer_data['district'])
+        
+
+        logging.debug(f"Czy lokalizacja {location_values} znajduje się już w locations?: NIE")
 
         location_query = """
             INSERT INTO locations (voivodeship, city, district)
             VALUES (%s, %s, %s)
             RETURNING id
             ;"""
-        location_values = (offer_data['voivodeship'], 
-                           offer_data['city'], 
-                           offer_data['district'])
         
         cur.execute(location_query, location_values)
         new_id = cur.fetchone()[0]
-        print(f"ID lokalizacji w tabeli locations: {new_id}")
+        logging.debug(f"Nadane ID lokalizacji w tabeli locations: {new_id}")
         
     else:
-        print("Czy lokalizacja znajduje się już w locations?: TAK")
+        logging.debug(f"Czy lokalizacja znajduje się już w locations?: TAK, pod id {location_result}")
+
 
 created_offer_id = None
-
 
 def insert_into_apartments_sale_listings_table(cur, offer_data):
     location_id = check_location_table(cur, offer_data)
@@ -105,7 +107,6 @@ def insert_into_apartments_sale_listings_table(cur, offer_data):
     cur.execute(listing_query, listing_values)
     
     created_offer_id = cur.fetchone()[0]
-    print(f"now ID oferty w tabeli apartments_sale_listings: {created_offer_id}")
 
     return created_offer_id
 
@@ -161,12 +162,14 @@ def insert_new_listing(offer_data, conn, cur):
         # TABELA photos
         insert_into_photos_table(cur, offer_data, created_offer_id)
 
-        print(f"Oferta zapisana w bazie pod id = {created_offer_id}")
+        logging.debug(f"Oferta zapisana w bazie pod id = {created_offer_id}")
 
         conn.commit()
-        print("ZAKOŃCZONE")
+        
+        return created_offer_id
+    
     except Exception as error:
-        print(f"Error during inserting new listing: {error}")
+        logging.exception(f"Error during inserting new listing: {error}")
 
 
 
@@ -186,9 +189,9 @@ def update_price_in_listings_table(data, cur):
         update_price_values = (new_price, new_price_per_m, id)
         cur.execute(update_price_query, update_price_values)
         
-        print(f"UPDATE oferty {id} w bazie: nowa cena - {new_price}, nowa cena za m2 - {new_price_per_m}")
+        logging.debug(f"BAZA: update oferty {id} w apartments_sale_listings: nowa cena - {new_price}, nowa cena za m2 - {new_price_per_m}")
     except Exception as error:
-        print(f"Error during updating price in listings_table: {error}")
+        logging.exception(f"Error during updating price in listings_table: {error}")
 
 
 def update_price_in_history_table(data, cur):
@@ -208,12 +211,17 @@ def update_price_in_history_table(data, cur):
         insert_history_query = """
             INSERT INTO price_history (listing_id, old_price, new_price, change_date)
             VALUES (%s, %s, %s, %s )
+            RETURNING id
             ;"""
         
         update_history_values = (id, old_price, new_price, change_date)
         cur.execute(insert_history_query, update_history_values)
+        id_history_table = cur.fetchone()[0]
+
+        logging.debug(f"BAZA: update oferty {id} w price_history pod id {id_history_table}")
+
     except Exception as error:
-        print(f"Error during updating price in price_history table: {error}")
+        logging.exception(f"Error during updating price in price_history table: {error}")
 
 
 def update_active_offers(data, conn, cur):
@@ -222,11 +230,10 @@ def update_active_offers(data, conn, cur):
         update_price_in_history_table(data, cur)
 
         conn.commit()
-        print("Update ceny w bazie zakonczony")
+        
     except Exception as error:
-        print(f"Error during updating active offers: {error}")
+        logging.exception(f"Error during updating active offers: {error}")
  
-
 
 def update_deleted_offers(offer_data, conn, cur):
     """" 
@@ -243,14 +250,13 @@ def update_deleted_offers(offer_data, conn, cur):
 
         current_date = datetime.date.today()
         id_db = offer_data[0]
-        print(id_db)
         update_inactive_values = (False, current_date, id_db)
         cur.execute(update_inactive_query, update_inactive_values)
 
-        print(f"W ofercie {id_db} zmieniono wartość 'active' na False z data {current_date} w kolumnie 'closing_date")
+        logging.debug(f"W ofercie {id_db} zmieniono wartość 'active' na 'false' z datą {current_date} w kolumnie 'closing_date")
 
         conn.commit()
-        print("ZAKOŃCZONE")
+        
     except Exception as error:
-        print(f"Error during updating deleted offers: {error}")
+        logging.exception(f"Error during updating deleted offers: {error}")
 

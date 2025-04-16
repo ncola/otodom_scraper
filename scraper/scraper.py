@@ -1,4 +1,4 @@
-import requests
+import requests, logging
 from urllib.robotparser import RobotFileParser
 from scraper.utils import save_data_to_excel
 
@@ -58,8 +58,6 @@ def scrape_offer(offer_to_insert: dict) -> dict:
     """
 
     try:
-        #print("Rozpoczynanie pobierania znalezionych nowych ofert:")
-
         offer_url = offer_to_insert.get("link")
         id = offer_to_insert.get("listing_id")
 
@@ -67,11 +65,12 @@ def scrape_offer(offer_to_insert: dict) -> dict:
         offer_data = download_data_from_listing_page(response)
         cleaned_offer_data = transform_data(offer_data)
 
-        print(f"Dane oferty {id} zostały pobrane")
+        logging.debug(f"Dane oferty {id} zostały pobrane")
 
         return cleaned_offer_data
     except Exception as error:
-        print(f"Error during scraping page offer: {error}")
+        logging.exception(f"Error during scraping page offer: {error}")
+        return None
 
 
 def scrape_all_pages(url): # jednak NOT IN USE LEFT IN CASE (zbyt duzo pamieci na raz, wole kazda oferte analizowac na biezaco)
