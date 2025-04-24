@@ -148,7 +148,6 @@ def insert_into_photos_table(cur, offer_data, id):
 
 
 def insert_new_listing(offer_data, conn, cur):
-
     try:
         # TABELA locations
         insert_into_locations_table(cur, offer_data)
@@ -172,19 +171,15 @@ def insert_new_listing(offer_data, conn, cur):
         logging.exception(f"Error during inserting new listing: {error}")
 
 
-
-def update_price_in_listings_table(data, cur):
+def update_price_in_listings_table(offer_data, cur):
     try:
-        id = data.get("id")
+        id, new_price, new_price_per_m = offer_data
 
         update_price_query = """
             UPDATE apartments_sale_listings
             SET updated_price = %s, updated_price_per_m = %s
             WHERE id = %s
             ;"""
-        
-        new_price = data.get("new_price")
-        new_price_per_m = data.get("new_price_per_m")
 
         update_price_values = (new_price, new_price_per_m, id)
         cur.execute(update_price_query, update_price_values)
@@ -194,10 +189,10 @@ def update_price_in_listings_table(data, cur):
         logging.exception(f"Error during updating price in listings_table: {error}")
 
 
-def update_price_in_history_table(data, cur):
+def update_price_in_history_table(offer_data, cur):
     try:
-        id = data.get("id")
-        new_price = data.get("new_price")
+        id, new_price, _ = offer_data
+
         change_date = datetime.date.today()
 
         old_price_query = """
@@ -224,10 +219,10 @@ def update_price_in_history_table(data, cur):
         logging.exception(f"Error during updating price in price_history table: {error}")
 
 
-def update_active_offers(data, conn, cur):
+def update_active_offers(offer_data, conn, cur):
     try:
-        update_price_in_listings_table(data, cur)
-        update_price_in_history_table(data, cur)
+        update_price_in_listings_table(offer_data, cur)
+        update_price_in_history_table(offer_data, cur)
 
         conn.commit()
         

@@ -141,8 +141,12 @@ def download_data_from_search_results(base_url: str) -> list:
                 continue
 
             json_data = json.loads(script_tag.string)
+            all_offers_id_on_page = json_data.get("props", {}).get("pageProps", {}).get("tracking", {}).get("listing", {}).get("ad_impressions", [])
+
             offers = json_data.get("props", {}).get("pageProps", {}).get("data", {}).get("searchAds", {}).get("items", [])
             
+            #print("Struktura JSON (od props/pageProps/ad):", json.dumps(offers, indent=7)[:420000])
+
             if not offers:
                 logging.exception(f"Brak ofert na stronie {page} url {base_url}")
                 continue
@@ -255,14 +259,14 @@ def check_if_price_changed(fetched_data_from_otodom: dict, cur) -> tuple:
         id_db, old_price = result
 
         logging.debug(f"    Dla id {id_otodom}  na stronie cena wynosi {new_price} (cena za m2: {new_price_per_m})")
-        logging.debug(f"    W bazie ta oferta ma id: {id_db}  ma zapisaną cenę {old_price}\n")
+        logging.debug(f"    W bazie ta oferta ma id: {id_db}  ma zapisaną cenę {old_price}")
         
         if old_price == new_price:
-            logging.info(f"W ofercie {id_otodom} ({id_db}) cena {old_price} jest aktualna")
-            return id_db, False
+            logging.info(f"W ofercie {id_otodom} ({id_db}) cena {old_price} jest aktualna\n")
+            return id_db, False, False
         else:
             logging.debug(f"W ofercie {id_otodom} ({id_db}) cena {old_price} jest nieaktualna, nowa cena wynosi {new_price}\n")
-            return id_db, new_price
+            return id_db, new_price, new_price_per_m
 
     except Exception as error:
         logging.exception(f"Error during checking if price changed: {error}")
@@ -306,7 +310,8 @@ def find_potentially_deleted_offers(fetched_all_data_from_otodom: list, city:str
 
     potentially_deleted = set()
     for id_db, id_otodom_from_db, area_from_db in all_offers_from_db:
-        if (id_otodom_from_db, area_from_db) not in data_from_otodom:
+        area_from_db_float = float(area_from_db)
+        if (id_otodom_from_db, area_from_db_float) not in data_from_otodom:
             potentially_deleted.add(id_db)
 
     logging.debug("*"*100)
@@ -526,6 +531,7 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
         energy_certificate = target.get("Energy_certificate", None)        
         city = target.get("City", None)
         voivodeship = target.get("Province", None)
+
         construction_status = str(target.get("Construction_status", None)) #under_construction; completed; planned; ready_for_occupancy
         floor_num = str(target.get("Floor_no", None))
         price = target.get("Price", None)
@@ -551,15 +557,20 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
         # Zdjęcia
         images = []
         images_html = offer_data.get("images", None)
-        for element in images_html:
-            image_link = element.get("medium", None)
-            image_response = fetch_page(image_link)
-            arr = np.asarray(bytearray(image_response.content), dtype=np.uint8)
-            img = cv2.imdecode(arr, cv2.IMREAD_COLOR) # konwersja na obraz
-            success, encoded_image = cv2.imencode('.jpg', img) # zakodowanie obrazu na dane binarne jpg (na potrzeby postgreSQL)
-            if success:
-                binary_image = encoded_image.tobytes() 
-                images.append(binary_image)
+        logging.debug(f"Znaleziono {len(images_html)} zdjęć dla oferty")
+        for n, element in enumerate(images_html, start=1):
+            try:
+                image_link = element.get("medium", None)
+                image_response = fetch_page(image_link)
+                arr = np.asarray(bytearray(image_response.content), dtype=np.uint8)
+                img = cv2.imdecode(arr, cv2.IMREAD_COLOR) # konwersja na obraz
+                success, encoded_image = cv2.imencode('.jpg', img) # zakodowanie obrazu na dane binarne jpg (na potrzeby postgreSQL)
+                if success:
+                    binary_image = encoded_image.tobytes() 
+                    images.append(binary_image)
+            except Exception as e:
+                logging.warning(f"Error during fetching image {n} in listing {listing_id} ({image_link}): {e}")
+
 
         # linki
         links = (offer_data.get("links", {}))
@@ -642,6 +653,9 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
         data["offer_link"] = f"https://www.otodom.pl/pl/oferta/{offer_data.get('slug', '')}"
 
         data['active'] = True
+
+
+        logging.debug(f"{data['offer_link']}, voivodeship: {voivodeship}          000000000000000000000000000000000000000000000")
 
         return data
 

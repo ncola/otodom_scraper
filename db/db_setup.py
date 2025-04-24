@@ -43,8 +43,19 @@ def get_db_connection():
         logging.debug(f"Error while connecting to database: {error}")
     return connection
 
+def check_table_exists(cur, table_name):
+            checking_query = """
+                SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                AND table_name = %s);
+                """
+            cur.execute(checking_query, (table_name,)) #argumenty w zapytaniach muszą byv przekazane jako krotka lub lista
+            result = cur.fetchone()
+            return result[0] # true/false
 
-# Utworzenie tabel
+
 def create_tables(cur):
     """
     Creates the necessary tables for storing apartment listings, price history, photos, and features in the database
@@ -66,19 +77,6 @@ def create_tables(cur):
     
         cur=conn.cursor()
 
-        # Sprawdź czy tabele juz nie istnieja
-        def check_table_exists(cur, table_name):
-            checking_query = """
-                SELECT EXISTS (
-                SELECT 1
-                FROM information_schema.tables
-                WHERE table_schema = 'public'
-                AND table_name = %s);
-                """
-            cur.execute(checking_query, (table_name,)) #argumenty w zapytaniach muszą byv przekazane jako krotka lub lista
-            result = cur.fetchone()
-            return result[0] # true/false
-        
         tables = ['locations', 'apartments_sale_listings', 'price_history', 'photos', 'features']
         
         flag = any(check_table_exists(cur, name) for name in tables)
