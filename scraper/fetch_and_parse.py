@@ -108,6 +108,7 @@ def download_data_from_search_results(base_url: str) -> list:
             - price (int): Total price  or None
             - price_per_m (float): Price per m2 or None
             - link (str): URL to the individual listing or None
+            - development_id (int): id of the specific investment to which the offer belongs or None
 
     Raises:
         Exception: If the first page fails to load, or if parsing fails due to a missing or incorrect script tag
@@ -141,7 +142,7 @@ def download_data_from_search_results(base_url: str) -> list:
                 continue
 
             json_data = json.loads(script_tag.string)
-            all_offers_id_on_page = json_data.get("props", {}).get("pageProps", {}).get("tracking", {}).get("listing", {}).get("ad_impressions", [])
+            #all_offers_id_on_page = json_data.get("props", {}).get("pageProps", {}).get("tracking", {}).get("listing", {}).get("ad_impressions", [])
 
             offers = json_data.get("props", {}).get("pageProps", {}).get("data", {}).get("searchAds", {}).get("items", [])
             
@@ -151,7 +152,7 @@ def download_data_from_search_results(base_url: str) -> list:
                 logging.exception(f"Brak ofert na stronie {page} url {base_url}")
                 continue
             
-            logging.debug(f"Liczba znalezionych ofert na stronie {page}: {len(offers)}")
+            #logging.debug(f"Liczba znalezionych ofert na stronie {page}: {len(offers)}")
 
             n=1
             for offer in offers: 
@@ -166,20 +167,44 @@ def download_data_from_search_results(base_url: str) -> list:
                     price_per_m = ppm_data.get("value", None)
                 else: 
                     price_per_m = None
-                
                 link = f"https://www.otodom.pl/pl/oferta/{offer.get('slug', None)}"
 
-                logging.debug(f"{n}.id oferty z searching page: {listing_id}, area: {area}, price: {price}, price_per_m: {price_per_m}, link: {link}")
+                #sprawdz czy nie ma wiecej ofert (powiazanych)
+                other_offers = offer.get("relatedAds", None) 
+                if other_offers: 
+                    logging.debug(f"{n}. ID oferty z searching page: {listing_id}, area: {area}, price: {price}, price_per_m: {price_per_m}, link: {link}, OFERTA OD DEWELOPERA, POWIAZANAN Z INNYMI:")
+                    for related_offer in other_offers:
+                        id = related_offer.get("id")
+                        area = round(float(related_offer.get("areaInSquareMeters", 0)),2)
+                        total_price = related_offer.get("totalPrice", {})
+                        price = total_price.get("value", None) if isinstance(total_price, dict) else None
+                        ppm_data = related_offer.get("pricePerSquareMeter", {})
+                        if ppm_data:
+                            price_per_m = ppm_data.get("value", None)
+                        else: 
+                            price_per_m = None
+                        link = f"https://www.otodom.pl/pl/oferta/{related_offer.get('slug', None)}"
 
-                all_offers.append({
-                    'listing_id': listing_id,
-                    'area': area,
-                    'price': price,
-                    'price_per_m': price_per_m,
-                    'link': link
-                })
+                        all_offers.append({
+                            'listing_id': listing_id,
+                            'area': area,
+                            'price': price,
+                            'price_per_m': price_per_m,
+                            'link': link
+                        })
+
+                else:
+                    logging.debug(f"{n}. ID oferty z searching page: {listing_id}, area: {area}, price: {price}, price_per_m: {price_per_m}, link: {link}")
+
+                    all_offers.append({
+                        'listing_id': listing_id,
+                        'area': area,
+                        'price': price,
+                        'price_per_m': price_per_m,
+                        'link': link
+                    })
                 n+=1
-
+        logging.debug(all_offers)
         return all_offers
 
     except Exception as error:
@@ -421,49 +446,6 @@ def find_closed_offers(data:list, city:str, cur) ->set:
 
     except Exception as error:
         logging.exception(f"Error during finding closed offers: {error}")
-
-
-
-def categorize_offers_for_db(offers_data): #jednak NOT IN USE LEFT IN CASE
-    """ 
-    przyjmuje all_offers z download_data_from_search_results() i dzieli je na:
-    - takie, których nie ma w bazie ( -> przesyłane do scrape_all_pages() (bd trzeba zmienic nazwe))
-    - takie, które są w bazie ale zmienila sie cena ( -> -> przesyłane do update_offers() )
-    - takie, z którymi nie trzeba nic robić, ich nie zapisujemy bo nei sa potrzebne ( -> zostawiamy)
-    """
-    conn = None
-    cur = None  
-    try:
-        conn = get_db_connection()
-        if conn is None:
-            print("Connection to the databas failed")
-            return
-        cur=conn.cursor()
-        need_update_offers = []
-        new_offers = []
-
-        n=0
-        for offer in offers_data:
-            if not check_if_offer_exists(offer, cur):
-                new_offers.append(offer)
-            else:
-                id, new_price, new_price_per_m = check_if_price_changed(offer, cur)
-                if new_price: #jezeli jest to jakas liczba
-                    need_update_offers.append({"id": id, "new_price": new_price, "new_price_per_m": new_price_per_m})
-                if not new_price:
-                    n+=1
-        print(f"\nZnaleziono {n} ofert, które juz są w bazie i nie wymagają update ceny")
-
-        # new_offers to lista słowników tak jak w danych wejściwoych czyli wynik download_data_from_search_results()
-        # need_update_offers to lista słowników z wartsociami id, new_price i new_price_per_m
-
-        return need_update_offers, new_offers
-    except Exception as error:
-        print(f"Error during categorizing offers for db: {error}")
-    finally: 
-        if conn:
-            cur.close()
-            conn.close()
 
 
 def download_data_from_listing_page(html_response:requests.Response) -> dict:
