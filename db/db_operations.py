@@ -55,10 +55,10 @@ def insert_into_apartments_sale_listings_table(cur, offer_data):
         area, price, updated_price, price_per_m, updated_price_per_m, location_id, street, rent_amount, 
         rooms_num, floor_num, heating, ownership, proper_type, construction_status, energy_certificate, 
         building_build_year, building_floors_num,  building_material, building_type, windows_type,  
-        local_plan_url, video_url, view3d_url, walkaround_url, owner_id, owner_name, agency_id, 
+        local_plan_url, video_url, view3d_url, walkaround_url, development_id, development_title, owner_id, owner_name, agency_id, 
         agency_name, offer_link, active, closing_date)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         ;"""
     
@@ -96,6 +96,8 @@ def insert_into_apartments_sale_listings_table(cur, offer_data):
                       offer_data['video_url'],
                       offer_data['view3d_url'],
                       offer_data['walkaround_url'],
+                      offer_data['development_id'],
+                      offer_data['development_title'],
                       offer_data['owner_id'],
                       offer_data['owner_name'],
                       offer_data['agency_id'],

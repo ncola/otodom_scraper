@@ -185,13 +185,15 @@ def download_data_from_search_results(base_url: str) -> list:
                             price_per_m = None
                         link = f"https://www.otodom.pl/pl/oferta/{related_offer.get('slug', None)}"
 
+                        logging.debug(f"{n}. ID oferty z searching page: {id}, area: {area}, price: {price}, price_per_m: {price_per_m}, link: {link}")
                         all_offers.append({
-                            'listing_id': listing_id,
+                            'listing_id': id,
                             'area': area,
                             'price': price,
                             'price_per_m': price_per_m,
                             'link': link
                         })
+                        n+=1
 
                 else:
                     logging.debug(f"{n}. ID oferty z searching page: {listing_id}, area: {area}, price: {price}, price_per_m: {price_per_m}, link: {link}")
@@ -204,6 +206,9 @@ def download_data_from_search_results(base_url: str) -> list:
                         'link': link
                     })
                 n+=1
+            
+            logging.debug(f"Liczba znalezionych ofert na stronie {page}: {n-1}")
+
         logging.debug(all_offers)
         return all_offers
 
@@ -290,7 +295,7 @@ def check_if_price_changed(fetched_data_from_otodom: dict, cur) -> tuple:
             logging.info(f"W ofercie {id_otodom} ({id_db}) cena {old_price} jest aktualna\n")
             return id_db, False, False
         else:
-            logging.debug(f"W ofercie {id_otodom} ({id_db}) cena {old_price} jest nieaktualna, nowa cena wynosi {new_price}\n")
+            logging.debug(f"W ofercie {id_otodom} ({id_db}) cena {old_price} jest nieaktualna, nowa cena wynosi {new_price}")
             return id_db, new_price, new_price_per_m
 
     except Exception as error:
@@ -536,7 +541,7 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
         for data in reverseGeocoding_locations:
             district = data.get("name") if data.get("locationLevel") == "district" else None
 
-        # Zdjęcia
+        # zdjęcia
         images = []
         images_html = offer_data.get("images", None)
         logging.debug(f"Znaleziono {len(images_html)} zdjęć dla oferty")
@@ -562,9 +567,11 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
         walkaround_url = (links.get("walkaroundUrl", None))
         
         # sprzedający
-        seller = (offer_data.get("owner", {}))
-        owner_id = (seller.get("id", None))
-        owner_name = (seller.get("name", None))
+        development_id = offer_data.get("developmentId", None)
+        development_title = offer_data.get("developmentTitle", None)
+        seller = offer_data.get("owner", {})
+        owner_id = seller.get("id", None)
+        owner_name = seller.get("name", None)
 
         agency = (offer_data.get("agency", {}))
         if agency:
@@ -625,13 +632,15 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
         # zdjęcia
         data["images"] = images
         
-        # Sprzedajacy
+        # sprzedajacy
+        data["development_id"] = development_id
+        data["development_title"] = development_title or None
         data["owner_id"] = owner_id
         data["owner_name"] = owner_name
         data["agency_id"] = agency_id
         data["agency_name"] = agency_name
 
-        # Link do oferty
+        # link do oferty
         data["offer_link"] = f"https://www.otodom.pl/pl/oferta/{offer_data.get('slug', '')}"
 
         data['active'] = True

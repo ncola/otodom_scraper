@@ -41,6 +41,8 @@ CREATE TABLE apartments_sale_listings (
     video_url TEXT,  -- URL do wideo
     view3d_url TEXT,  -- URL do widoku 3D
     walkaround_url TEXT,  -- URL do spaceru
+    development_id BIGINT, -- ID inwestycji, może być NULL
+    development_title TEXT, -- Nazwa inwestycji, może być NULL
     owner_id BIGINT,  -- ID właściciela oferty
     owner_name TEXT,  -- Imię właściciela oferty
     agency_id BIGINT,  -- ID agencji, może być NULL
