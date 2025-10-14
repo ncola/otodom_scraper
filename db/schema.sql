@@ -13,7 +13,7 @@ CREATE TABLE apartments_sale_listings (
     advert_type TEXT, -- Rodzaj ogłoszenia (prywatne/agencja)
     creation_date DATE, -- Data utworzenia oferty
     creation_time TEXT,  -- Godzina utworzenia oferty
-    pushed_ap_at DATE,  -- Data 'wypchania' na górę (promowanie, odświezenie, algorytm olx)
+    pushed_up_at DATE,  -- Data 'wypchania' na górę (promowanie, odświezenie, algorytm olx)
     exclusive_offer BOOLEAN, -- Czy wyróznione
     creation_source TEXT, -- Sposób wprowadzenia oferty (ręcznie, poprzez API)
     description_text TEXT, -- Opis

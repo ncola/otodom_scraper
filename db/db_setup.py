@@ -30,18 +30,29 @@ def get_db_connection():
 
     connection = None
     try:
+        host=os.getenv('DB_HOST')
+        dbname=os.getenv('DB_NAME')
+        user=os.getenv('DB_USER')
+        password=os.getenv('DB_PASSWORD')
+        port=os.getenv('DB_PORT')
+
+        if not all([host, dbname, user, password, port]):
+            raise ValueError("Brak wymaganych zmiennych środowiskowych do połączenia z bazą danych")
+        
         connection = psycopg2.connect(
-            host=os.getenv('DB_HOST'),
-            dbname=os.getenv('DB_NAME'),
-            user=os.getenv('DB_USER'),
-            password=os.getenv('DB_PASSWORD'),
-            port=os.getenv('DB_PORT')
+            host=host,
+            dbname=dbname,
+            user=user,
+            password=password,
+            port=port
         )
+
         logging.debug(f"Connected to database {os.getenv('DB_NAME')}")
         return connection
     except Exception as error:
         logging.debug(f"Error while connecting to database: {error}")
     return connection
+
 
 def check_table_exists(cur, table_name):
             checking_query = """

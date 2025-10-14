@@ -2,7 +2,7 @@ import requests, logging
 from urllib.robotparser import RobotFileParser
 from scraper.utils import save_data_to_excel
 
-from scraper.fetch_and_parse import fetch_page, download_data_from_search_results, download_data_from_listing_page, categorize_offers_for_db, find_closed_offers
+from scraper.fetch_and_parse import fetch_page, download_data_from_search_results, download_data_from_listing_page, find_closed_offers
 from scraper.transform_data import transform_data
 
 url_main = "https://www.otodom.pl/pl/wyniki/sprzedaz/mieszkanie/slaskie/katowice?by=LATEST&direction=DESC"

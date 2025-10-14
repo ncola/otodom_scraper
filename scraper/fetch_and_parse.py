@@ -156,56 +156,65 @@ def download_data_from_search_results(base_url: str) -> list:
 
             n=1
             for offer in offers: 
-                # sprawdz czy nie jest to zbiorowe ogloszenie do ktorego nie mam obslugi
+                try:
+                    listing_id = offer.get("id")
+                    area = round(float(offer.get("areaInSquareMeters", 0)),2)
+                    if area is not None:
+                        area = round(float(area),2)
+                    else:
+                        area = 0
+                    total_price = offer.get("totalPrice", {})
+                    price = total_price.get("value", None) if isinstance(total_price, dict) else None
+                    ppm_data = offer.get("pricePerSquareMeter", {})
+                    if ppm_data:
+                        price_per_m = ppm_data.get("value", None)
+                    else: 
+                        price_per_m = None
+                    link = f"https://www.otodom.pl/pl/oferta/{offer.get('slug', None)}"
 
-                listing_id = offer.get("id")
-                area = round(float(offer.get("areaInSquareMeters", 0)),2)
-                total_price = offer.get("totalPrice", {})
-                price = total_price.get("value", None) if isinstance(total_price, dict) else None
-                ppm_data = offer.get("pricePerSquareMeter", {})
-                if ppm_data:
-                    price_per_m = ppm_data.get("value", None)
-                else: 
-                    price_per_m = None
-                link = f"https://www.otodom.pl/pl/oferta/{offer.get('slug', None)}"
+                    #sprawdz czy nie ma wiecej ofert (powiazanych)
+                    other_offers = offer.get("relatedAds", None) 
+                    if other_offers: 
+                        logging.debug(f"{n}. ID oferty z searching page: {listing_id}, area: {area}, price: {price}, price_per_m: {price_per_m}, link: {link}, OFERTA OD DEWELOPERA, POWIAZANAN Z INNYMI:")
+                        for related_offer in other_offers:
+                            id = related_offer.get("id")
+                            area = related_offer.get("areaInSquareMeters", 0)
+                            if area is not None:
+                                area = round(float(area),2)
+                            else:
+                                area = 0
+                            total_price = related_offer.get("totalPrice", {})
+                            price = total_price.get("value", None) if isinstance(total_price, dict) else None
+                            ppm_data = related_offer.get("pricePerSquareMeter", {})
+                            if ppm_data:
+                                price_per_m = ppm_data.get("value", None)
+                            else: 
+                                price_per_m = None
+                            link = f"https://www.otodom.pl/pl/oferta/{related_offer.get('slug', None)}"
 
-                #sprawdz czy nie ma wiecej ofert (powiazanych)
-                other_offers = offer.get("relatedAds", None) 
-                if other_offers: 
-                    logging.debug(f"{n}. ID oferty z searching page: {listing_id}, area: {area}, price: {price}, price_per_m: {price_per_m}, link: {link}, OFERTA OD DEWELOPERA, POWIAZANAN Z INNYMI:")
-                    for related_offer in other_offers:
-                        id = related_offer.get("id")
-                        area = round(float(related_offer.get("areaInSquareMeters", 0)),2)
-                        total_price = related_offer.get("totalPrice", {})
-                        price = total_price.get("value", None) if isinstance(total_price, dict) else None
-                        ppm_data = related_offer.get("pricePerSquareMeter", {})
-                        if ppm_data:
-                            price_per_m = ppm_data.get("value", None)
-                        else: 
-                            price_per_m = None
-                        link = f"https://www.otodom.pl/pl/oferta/{related_offer.get('slug', None)}"
+                            logging.debug(f"{n}. ID oferty z searching page: {id}, area: {area}, price: {price}, price_per_m: {price_per_m}, link: {link}")
+                            all_offers.append({
+                                'listing_id': id,
+                                'area': area,
+                                'price': price,
+                                'price_per_m': price_per_m,
+                                'link': link
+                            })
+                            n+=1
 
-                        logging.debug(f"{n}. ID oferty z searching page: {id}, area: {area}, price: {price}, price_per_m: {price_per_m}, link: {link}")
+                    else:
+                        logging.debug(f"{n}. ID oferty z searching page: {listing_id}, area: {area}, price: {price}, price_per_m: {price_per_m}, link: {link}")
+
                         all_offers.append({
-                            'listing_id': id,
+                            'listing_id': listing_id,
                             'area': area,
                             'price': price,
                             'price_per_m': price_per_m,
                             'link': link
                         })
-                        n+=1
-
-                else:
-                    logging.debug(f"{n}. ID oferty z searching page: {listing_id}, area: {area}, price: {price}, price_per_m: {price_per_m}, link: {link}")
-
-                    all_offers.append({
-                        'listing_id': listing_id,
-                        'area': area,
-                        'price': price,
-                        'price_per_m': price_per_m,
-                        'link': link
-                    })
-                n+=1
+                    n+=1
+                except Exception as error:
+                    logging.exception(f"Pominięto ofertę {n} ze strony {page} ({listing_id} lub powiazana) z powodu błędu: {error}")
             
             logging.debug(f"Liczba znalezionych ofert na stronie {page}: {n-1}")
 
@@ -378,7 +387,6 @@ def find_offer_link(potentially_deleted_data: set, cur) -> set:
         
         cur.execute(check_potentially_deleted_query, (id_from_db,))
         offer_link = cur.fetchone()[0]
-
         links.add((id_from_db, offer_link))
 
         logging.debug(f"{id_from_db}: {offer_link}")
@@ -411,6 +419,7 @@ def get_offer_status(offer_link: str) ->str:
         
     except Exception as error:
         logging.exception(f"Error during getting offer status: {error}")
+        return "removed"
 
 
 def find_closed_offers(data:list, city:str, cur) ->set:
@@ -441,7 +450,7 @@ def find_closed_offers(data:list, city:str, cur) ->set:
             logging.debug(f"Oferta {id_from_db}, link: {offer_link}")
             status = get_offer_status(offer_link)
             logging.debug(f"status: {status}")
-            if 'active' not in status:
+            if status is None or 'active' not in status:
                 deleted_offers.add((id_from_db, status))
                 logging.debug("Dodano do listy usuniętych ofert")
         logging.debug("\n")   
@@ -542,22 +551,21 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
             district = data.get("name") if data.get("locationLevel") == "district" else None
 
         # zdjęcia
-        images = []
-        images_html = offer_data.get("images", None)
-        logging.debug(f"Znaleziono {len(images_html)} zdjęć dla oferty")
-        for n, element in enumerate(images_html, start=1):
-            try:
-                image_link = element.get("medium", None)
-                image_response = fetch_page(image_link)
-                arr = np.asarray(bytearray(image_response.content), dtype=np.uint8)
-                img = cv2.imdecode(arr, cv2.IMREAD_COLOR) # konwersja na obraz
-                success, encoded_image = cv2.imencode('.jpg', img) # zakodowanie obrazu na dane binarne jpg (na potrzeby postgreSQL)
-                if success:
-                    binary_image = encoded_image.tobytes() 
-                    images.append(binary_image)
-            except Exception as e:
-                logging.warning(f"Error during fetching image {n} in listing {listing_id} ({image_link}): {e}")
-
+        #images = []
+        #images_html = offer_data.get("images", None)
+        #logging.debug(f"Znaleziono {len(images_html)} zdjęć dla oferty")
+        #for n, element in enumerate(images_html, start=1):
+        #    try:
+        #        image_link = element.get("medium", None)
+        #        image_response = fetch_page(image_link)
+        #        arr = np.asarray(bytearray(image_response.content), dtype=np.uint8)
+        #        img = cv2.imdecode(arr, cv2.IMREAD_COLOR) # konwersja na obraz
+        #        success, encoded_image = cv2.imencode('.jpg', img) # zakodowanie obrazu na dane binarne jpg (na potrzeby postgreSQL)
+        #        if success:
+        #            binary_image = encoded_image.tobytes() 
+        #            images.append(binary_image)
+        #    except Exception as e:
+        #        logging.warning(f"Error during fetching image {n} in listing {listing_id} ({image_link}): {e}")
 
         # linki
         links = (offer_data.get("links", {}))
@@ -588,7 +596,7 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
         data["market"] = market_type
         data["advert_type"] = advertisement_type
         data["creation_date"] = creation_date
-        data["pushed_ap_at"] = promoted_at
+        data["pushed_up_at"] = promoted_at
         data["exclusive_offer"] = is_exclusive_offer
         data["creation_source"] = creation_source
 
@@ -630,12 +638,12 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
         data["walkaround_url"] = walkaround_url
 
         # zdjęcia
-        data["images"] = images
+        #data["images"] = images
         
         # sprzedajacy
         data["development_id"] = development_id
         data["development_title"] = development_title or None
-        data["owner_id"] = owner_id
+        data["owner_id"] = None if owner_id == 0 else owner_id
         data["owner_name"] = owner_name
         data["agency_id"] = agency_id
         data["agency_name"] = agency_name
@@ -644,9 +652,6 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
         data["offer_link"] = f"https://www.otodom.pl/pl/oferta/{offer_data.get('slug', '')}"
 
         data['active'] = True
-
-
-        logging.debug(f"{data['offer_link']}, voivodeship: {voivodeship}          000000000000000000000000000000000000000000000")
 
         return data
 

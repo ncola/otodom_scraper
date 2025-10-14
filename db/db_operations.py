@@ -51,7 +51,7 @@ def insert_into_apartments_sale_listings_table(cur, offer_data):
     location_id = check_location_table(cur, offer_data)
     listing_query = """
         INSERT INTO apartments_sale_listings (otodom_listing_id, title, market, advert_type, 
-        creation_date, creation_time, pushed_ap_at, exclusive_offer, creation_source, description_text, 
+        creation_date, creation_time, pushed_up_at, exclusive_offer, creation_source, description_text, 
         area, price, updated_price, price_per_m, updated_price_per_m, location_id, street, rent_amount, 
         rooms_num, floor_num, heating, ownership, proper_type, construction_status, energy_certificate, 
         building_build_year, building_floors_num,  building_material, building_type, windows_type,  
@@ -68,7 +68,7 @@ def insert_into_apartments_sale_listings_table(cur, offer_data):
                       offer_data['advert_type'],
                       offer_data['creation_date'],
                       offer_data['creation_time'],
-                      offer_data['pushed_ap_at'],
+                      offer_data['pushed_up_at'],
                       offer_data['exclusive_offer'],
                       offer_data['creation_source'],
                       offer_data['description_text'],
@@ -161,7 +161,7 @@ def insert_new_listing(offer_data, conn, cur):
         insert_into_features_table(cur, offer_data, created_offer_id)
 
         # TABELA photos
-        insert_into_photos_table(cur, offer_data, created_offer_id)
+        #insert_into_photos_table(cur, offer_data, created_offer_id)
 
         logging.debug(f"Oferta zapisana w bazie pod id = {created_offer_id}")
 
