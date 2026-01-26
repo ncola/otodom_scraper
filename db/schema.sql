@@ -49,15 +49,15 @@ CREATE TABLE apartments_sale_listings (
     agency_name TEXT, -- Nazwa agencji
     offer_link TEXT,  -- Link do oferty 
     active BOOLEAN,  -- Status oferty (czy aktualna)
-    closing_date DATE, -- Data zniknięcia oferty (sprzedaz, usunięcie, wygaśnięcie)
+    detected_inactive_at DATE, -- Data zniknięcia oferty (sprzedaz, usunięcie, wygaśnięcie)
     FOREIGN KEY(location_id) REFERENCES locations(id)
 );
 
 CREATE TABLE price_history (
     id SERIAL PRIMARY KEY, -- ID tabeli price_history
-    listing_id BIGINT, -- ID oferty
-    old_price INT, -- Poprzednia cena
-    new_price INT, -- Nowa cena
+    listing_id INT, -- ID oferty
+    old_price BIGINT, -- Poprzednia cena
+    new_price BIGINT, -- Nowa cena
     change_date DATE, -- Data dokonania zmiany
     FOREIGN KEY (listing_id) REFERENCES apartments_sale_listings(id) -- Ustanowienie ID oferty kluczem obcym 
 );

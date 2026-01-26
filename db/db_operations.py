@@ -56,7 +56,7 @@ def insert_into_apartments_sale_listings_table(cur, offer_data):
         rooms_num, floor_num, heating, ownership, proper_type, construction_status, energy_certificate, 
         building_build_year, building_floors_num,  building_material, building_type, windows_type,  
         local_plan_url, video_url, view3d_url, walkaround_url, development_id, development_title, owner_id, owner_name, agency_id, 
-        agency_name, offer_link, active, closing_date)
+        agency_name, offer_link, active, detected_inactive_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
@@ -104,7 +104,7 @@ def insert_into_apartments_sale_listings_table(cur, offer_data):
                       offer_data['agency_name'],
                       offer_data['offer_link'],
                       offer_data['active'],
-                      offer_data['closing_date'])
+                      offer_data['detected_inactive_at'])
     
     cur.execute(listing_query, listing_values)
     
@@ -241,7 +241,7 @@ def update_deleted_offers(offer_data, conn, cur):
 
         update_inactive_query = """
         UPDATE apartments_sale_listings
-        SET active = %s, closing_date = %s
+        SET active = %s, detected_inactive_at = %s
         WHERE id = %s
         ;"""
 
@@ -250,7 +250,7 @@ def update_deleted_offers(offer_data, conn, cur):
         update_inactive_values = (False, current_date, id_db)
         cur.execute(update_inactive_query, update_inactive_values)
 
-        logging.debug(f"W ofercie {id_db} zmieniono wartość 'active' na 'false' z datą {current_date} w kolumnie 'closing_date")
+        logging.debug(f"W ofercie {id_db} zmieniono wartość 'active' na 'false' z datą {current_date} w kolumnie 'detected_inactive_at")
 
         conn.commit()
         

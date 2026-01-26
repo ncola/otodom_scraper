@@ -171,7 +171,7 @@ def transform_data(data: dict) -> dict:
     transformed_data['price'] = clear_numbers(transformed_data.get('price'), val='int')
     transformed_data['price_per_m'] = clear_numbers(transformed_data.get('price_per_m'), val='int')
 
-    transformed_data['closing_date'] = None
+    transformed_data['detected_inactive_at'] = None
     
     return transformed_data
 
