@@ -12,8 +12,9 @@ from db.db_operations import insert_new_listing, update_active_offers, update_de
 from dotenv import load_dotenv
 load_dotenv()
 
-from config.logging_config import setup_logger
+from config.logging_config import setup_logger, setup_failed_offers_logger
 logger = setup_logger()
+failed_logger = setup_failed_offers_logger()
 
 # ZASADY: WYSZUKIWANIE MIESZKAN NA SPRZEDAZ W DANYM MIESCIE BEZ ZADNYCH FILTROW, ZALECANE SORTOWANIE OD NAJNOWSZYCH I MAX LIMIT OFERT NA STRONE
 
@@ -62,6 +63,8 @@ def main(url, city):
                     logging.info(f"Oferta {id} zapisana w bazie pod id {id_db}\n")
                 else:
                     logging.warning(f"Nie udało się pobrać pełnych danych oferty {id} – pomijam.")
+                    link = offer.get("link", "brak linku")
+                    failed_logger.error(f"{id} | {link} | Nie udało się pobrać pełnych danych oferty")
 
             # jezeli oferta sie znajduje, sprawdz czy nie zmienila sie cena
             else:
