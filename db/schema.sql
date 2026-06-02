@@ -100,3 +100,18 @@ CREATE TABLE features ( -- Oznaczenie cech mieszkania, jeden wiersz == jedno og≈
     FOREIGN KEY (listing_id) REFERENCES apartments_sale_listings(id)  
 );
 
+-- indexes for performance optimization
+CREATE UNIQUE INDEX IF NOT EXISTS ux_listing_otodom_id
+ON apartments_sale_listings (otodom_listing_id);
+
+CREATE INDEX IF NOT EXISTS ix_listing_location
+ON apartments_sale_listings (location_id);
+
+CREATE INDEX IF NOT EXISTS ix_price_history_listing
+ON price_history (listing_id);
+
+CREATE INDEX IF NOT EXISTS ix_features_listing
+ON features (listing_id);
+
+CREATE INDEX IF NOT EXISTS ix_photos_listing
+ON photos (listing_id);
