@@ -1,7 +1,8 @@
-import logging, colorlog
+import logging, colorlog, os
 from datetime import datetime
 
 def setup_logger():
+    os.makedirs("logs", exist_ok=True)
     log_filename = datetime.now().strftime("logs/otodom_app_log_%Y-%m-%d_%H-%M-%S.log")
 
     logger = logging.getLogger()

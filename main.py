@@ -71,7 +71,7 @@ def main(url, city):
 
                 if new_price:
                     update_active_offers((id_db, new_price, new_price_per_m), conn, cur)
-                    b_n=+1
+                    b_n+=1
                     logging.info(f"Update ceny oferty {id} w bazie zakonczony")
 
         logger.info("-----------------------------------------")

@@ -386,7 +386,11 @@ def find_offer_link(potentially_deleted_data: set, cur) -> set:
     for id_from_db in potentially_deleted_data:
         
         cur.execute(check_potentially_deleted_query, (id_from_db,))
-        offer_link = cur.fetchone()[0]
+        row = cur.fetchone()
+        if row is None:
+            logging.warning(f"Nie znaleziono linku dla oferty {id_from_db} – pomijam")
+            continue
+        offer_link = row[0]
         links.add((id_from_db, offer_link))
 
         logging.debug(f"{id_from_db}: {offer_link}")
@@ -547,8 +551,11 @@ def download_data_from_listing_page(html_response:requests.Response) -> dict:
             street = None
         
         reverseGeocoding_locations = offer_data.get("location", {}).get("reverseGeocoding", {}).get("locations", [])
+        district = None
         for data in reverseGeocoding_locations:
-            district = data.get("name") if data.get("locationLevel") == "district" else None
+            if data.get("locationLevel") == "district":
+                district = data.get("name")
+                break
 
         # zdjęcia
         #images = []

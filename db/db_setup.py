@@ -70,9 +70,9 @@ def check_table_exists(cur, table_name):
 def create_tables(cur):
     """
     Creates the necessary tables for storing apartment listings, price history, photos, and features in the database
-    
-    This function checks if the required tables (`locations`, `apartments_sale_listings`, `price_history`, 
-    `photos`, `features`) already exist in the database. If they do not exist, it reads SQL commands from a 
+
+    This function checks if the required tables (`locations`, `apartments_sale_listings`, `price_history`,
+    `photos`, `features`) already exist in the database. If they do not exist, it reads SQL commands from a
     file (db/schema.sql) and executes them to create the tables
 
     The schema.sql file should contain the SQL scripts for creating these tables
@@ -81,27 +81,21 @@ def create_tables(cur):
         Exception: If an error occurs during the table creation process
     """
     try:
-        conn = get_db_connection()
-        if conn is None:
-            logging.error("Connection to the databas failed")
-            return
-    
-        cur=conn.cursor()
-
         tables = ['locations', 'apartments_sale_listings', 'price_history', 'photos', 'features']
-        
-        flag = any(check_table_exists(cur, name) for name in tables)
+
+        flag = all(check_table_exists(cur, name) for name in tables)
         if not flag:
             try:
-                with open('db/schema.sql', 'r') as f:
+                schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
+                with open(schema_path, 'r') as f:
                     sql_script = f.read()
-                
+
                 sql_commands = sql_script.split(";")
                 for command in sql_commands:
                     if command.strip():
                         cur.execute(command.strip())
-                
-                conn.commit()
+
+                cur.connection.commit()
                 logging.info(f"Tables {tables} created")
             except Exception as error:
                 logging.exception(f"Error during creating tables: {error}")

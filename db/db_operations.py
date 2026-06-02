@@ -49,6 +49,8 @@ created_offer_id = None
 
 def insert_into_apartments_sale_listings_table(cur, offer_data):
     location_id = check_location_table(cur, offer_data)
+    if location_id is None:
+        raise ValueError(f"Nie znaleziono lokalizacji w bazie dla oferty {offer_data.get('listing_id')}. Upewnij się, że lokalizacja została wcześniej wstawiona.")
     listing_query = """
         INSERT INTO apartments_sale_listings (otodom_listing_id, title, market, advert_type, 
         creation_date, creation_time, pushed_up_at, exclusive_offer, creation_source, description_text, 
