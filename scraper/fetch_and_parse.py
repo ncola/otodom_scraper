@@ -338,22 +338,16 @@ def find_potentially_deleted_offers(fetched_all_data_from_otodom: list, city:str
     cur.execute(all_offers_from_db_query, (city.lower(),))
     all_offers_from_db = cur.fetchall()
 
-    data_from_otodom = set()
-    for offer_dict in  fetched_all_data_from_otodom:
-        id_otodom_from_otodom= offer_dict["listing_id"]
-        area_from_otodom = offer_dict["area"]
-        offer_data = (id_otodom_from_otodom, area_from_otodom)
-        data_from_otodom.add(offer_data)
+    ids_from_otodom = {offer_dict["listing_id"] for offer_dict in fetched_all_data_from_otodom}
 
     potentially_deleted = set()
     for id_db, id_otodom_from_db, area_from_db in all_offers_from_db:
-        area_from_db_float = float(area_from_db)
-        if (id_otodom_from_db, area_from_db_float) not in data_from_otodom:
+        if id_otodom_from_db not in ids_from_otodom:
             potentially_deleted.add(id_db)
 
     logging.debug("*"*100)
     logging.debug(f"offers in db: {all_offers_from_db}")
-    logging.debug(f"offers from otodom: {data_from_otodom}")
+    logging.debug(f"offer ids from otodom: {ids_from_otodom}")
     logging.debug("*"*100)
     logging.info(f"potentially deleted offers: {len(potentially_deleted)}")
 
@@ -372,27 +366,31 @@ def find_offer_link(potentially_deleted_data: set, cur) -> set:
         set: A set of tuples containing (offer_id_from_db, offer_link)
 
     """
-    check_potentially_deleted_query = """
-        SELECT offer_link
-        FROM apartments_sale_listings
-        WHERE id = %s
-        ;"""
-
     logging.debug("fetching links for potentially deleted offers")
-    links = set()
-    for id_from_db in potentially_deleted_data:
 
-        cur.execute(check_potentially_deleted_query, (id_from_db,))
-        row = cur.fetchone()
-        if row is None:
+    if not potentially_deleted_data:
+        return set()
+
+    cur.execute(
+        "SELECT id, offer_link FROM apartments_sale_listings WHERE id = ANY(%s)",
+        (list(potentially_deleted_data),)
+    )
+    rows = cur.fetchall()
+
+    links = set()
+    fetched_ids = set()
+    for id_from_db, offer_link in rows:
+        fetched_ids.add(id_from_db)
+        if offer_link is None:
             logging.warning(f"no link found for offer {id_from_db}, skipping")
             continue
-        offer_link = row[0]
         links.add((id_from_db, offer_link))
-
         logging.debug(f"offer {id_from_db}: {offer_link}")
 
-    return links 
+    for id_from_db in potentially_deleted_data - fetched_ids:
+        logging.warning(f"no link found for offer {id_from_db}, skipping")
+
+    return links
 
 
 def get_offer_status(offer_link: str) ->str:
@@ -411,13 +409,13 @@ def get_offer_status(offer_link: str) ->str:
             return "removed"
 
         soup = BeautifulSoup(html_response.text, 'html.parser')
-        script_tag = soup.find('script', {'id': '__NEXT_DATA__'}) 
-        if script_tag: 
+        script_tag = soup.find('script', {'id': '__NEXT_DATA__'})
+        if script_tag:
             json_data = json.loads(script_tag.string)
             status = json_data.get("props", {}).get("pageProps", {}).get("ad", {}).get("status", None)
-            
+
             return status
-        
+
     except Exception as error:
         logging.exception(f"Error during getting offer status: {error}")
         return "removed"
