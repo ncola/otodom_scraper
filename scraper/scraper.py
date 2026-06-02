@@ -57,20 +57,22 @@ def scrape_offer(offer_to_insert: dict) -> dict:
         Exception: If there is an error during the scraping process, such as issues with fetching the page or transforming the data
     """
 
-    try:
-        offer_url = offer_to_insert.get("link")
-        id = offer_to_insert.get("listing_id")
+    offer_url = offer_to_insert.get("link")
+    id = offer_to_insert.get("listing_id")
 
-        response = fetch_page(offer_url)
-        offer_data = download_data_from_listing_page(response)
-        cleaned_offer_data = transform_data(offer_data)
+    for attempt in range(1, 3):  # max 2 attempts
+        try:
+            response = fetch_page(offer_url)
+            offer_data = download_data_from_listing_page(response)
+            cleaned_offer_data = transform_data(offer_data)
+            logging.debug(f"offer {id} fetched successfully")
+            return cleaned_offer_data
 
-        logging.debug(f"Dane oferty {id} zostały pobrane")
-
-        return cleaned_offer_data
-    except Exception as error:
-        logging.exception(f"Error during scraping page offer: {error}")
-        return None
+        except Exception as error:
+            logging.warning(f"attempt {attempt}/2 failed for offer {id}: {error}")
+            if attempt == 2:
+                logging.error(f"all attempts failed for offer {id}, skipping")
+                return None
 
 
 def scrape_all_pages(url): # jednak NOT IN USE LEFT IN CASE (zbyt duzo pamieci na raz, wole kazda oferte analizowac na biezaco)
