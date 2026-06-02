@@ -27,30 +27,79 @@ The database is designed to store apartment listings data, price history, photos
 
 ![Database Structure](imgs/db_structure.png)
 
-## 🛠 Database Setup
+## 🚀 Running with Docker (recommended)
 
-Required **PostgreSQL** server running and a database named `apartments_for_sale` created:
+The easiest way to run the project is with Docker — no need to install PostgreSQL manually.
+
+**Requirements:** [Docker Desktop](https://www.docker.com/products/docker-desktop) installed and running.
+
+**1. Create your `.env` file** (copy from the example and fill in your password):
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+```
+DB_HOST=db
+DB_PORT=5432
+DB_NAME=apartments_for_sale_otodom
+DB_USER=postgres
+DB_PASSWORD=your_password_here
+```
+
+> ⚠️ Never commit `.env` to git — it contains your credentials. It is already listed in `.gitignore`.
+
+**2. Build and run:**
+
+```bash
+docker compose up --build
+```
+
+This will:
+- start a PostgreSQL container (`otodom_db`)
+- build the scraper image and run it once
+- scraper exits after finishing — no background processes left running
+
+**3. To run the scraper again** (database keeps its data between runs):
+
+```bash
+docker compose up
+```
+
+**4. To stop and remove containers:**
+
+```bash
+docker compose down
+```
+
+> 💡 Database data is stored in a Docker volume (`otodom_pgdata`) and persists between runs. To wipe the data completely: `docker compose down -v`
+
+
+## 🛠 Running locally (alternative)
+
+If you prefer to run without Docker, you need **PostgreSQL** installed and a database created:
 
 ```bash
 psql -U postgres
-CREATE DATABASE apartments_for_sale;
+CREATE DATABASE apartments_for_sale_otodom;
 ```
 
-
-## 🔑 Required Environment Variables
-
-Required a .env file in the project root with your PostgreSQL credentials:
+Then set up your `.env` with `DB_HOST=localhost` and run:
 
 ```bash
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=apartments_for_sale
-DB_USER=postgres
-DB_PASSWORD=your_password
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python3 main.py
 ```
 
-💡 When running main.py, the necessary tables will be automatically created if they don't already exist, so you don't need to manually handle the table setup.
-The imported in main.py db/db_setup.py module handles database connection and table creation. It checks if any required tables already exist. If not, it reads SQL commands from schema.sql and creates them (in case of starting it all again, it is better to drop all tables created before, as code check only if any required table exists)
+
+## 🔑 Environment Variables
+
+All configuration is done via `.env` file in the project root. See `.env.example` for the required variables.
+
+> 💡 When running for the first time, the necessary tables will be automatically created if they don't already exist.
 
 
 ## 📝 Logging

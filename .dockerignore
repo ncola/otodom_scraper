@@ -1,0 +1,9 @@
+venv/
+logs/
+.env
+__pycache__/
+*.pyc
+.git/
+output_data/
+ignore/
+*.md
