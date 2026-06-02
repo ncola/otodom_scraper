@@ -34,65 +34,59 @@ def main(url, city):
         
         # Upewnij się, ze to dozwolone
         result = is_allowed_to_scrape(url)
-        logging.warning(f"Is fetching page {url} allowed?: {result}")
+        logging.info(f"scraping allowed: {result}")
 
         # Utwórz tabele jezeli nie istnieją
         create_tables(cur)
 
         # pobierz dane
-        logging.info("Rozpoczynam pobieranie podstawowych danych z wyniku wyszukiwania...")
+        logging.info("fetching basic data from search results...")
         all_offers_basic_from_sarching_page = download_data_from_search_results(url)
 
-        logging.debug(f"Dane z all_offers_basic_from_sarching_page: \n{'--' * 100}\n{all_offers_basic_from_sarching_page}\n {'--' * 100}\n")
+        logging.debug(f"all offers from search page: {all_offers_basic_from_sarching_page}")
 
-        # sprawdz ktore oferty juz sa w bazie (i dodaj/aktualizuj cene): 
         a_n = 0
         b_n = 0
-        logging.info("\nRozpoczynam sprawdzanie i pobieranie ofert...")
+        logging.info("processing offers...")
         for offer in all_offers_basic_from_sarching_page:
             id = offer.get("listing_id")
             if len(str(id)) !=8: 
                 continue
-            logging.debug(f"Sprawdzam oferte {id}")
-            # Jezeli dana oferta nie znajduje sie jeszcze w bazie, pobierz ja i zapisz
+            logging.debug(f"checking offer {id}")
             if not check_if_offer_exists(offer, cur):
-                offer_data = scrape_offer(offer) # pobierz znaleziona oferte w całości
-                if offer_data: # jezeli brak bledu wstaw dane do bazy
-                    id_db = insert_new_listing(offer_data, conn, cur) # wstaw do bazy
-                    a_n+=1
-                    logging.info(f"Oferta {id} zapisana w bazie pod id {id_db}\n")
+                offer_data = scrape_offer(offer)
+                if offer_data:
+                    id_db = insert_new_listing(offer_data, conn, cur)
+                    a_n += 1
+                    logging.info(f"offer {id} saved to db under id {id_db}")
                 else:
-                    logging.warning(f"Nie udało się pobrać pełnych danych oferty {id} – pomijam.")
-                    link = offer.get("link", "brak linku")
-                    failed_logger.error(f"{id} | {link} | Nie udało się pobrać pełnych danych oferty")
-
-            # jezeli oferta sie znajduje, sprawdz czy nie zmienila sie cena
+                    logging.warning(f"failed to fetch offer {id}, skipping")
+                    link = offer.get("link", "no link")
+                    failed_logger.error(f"{id} | {link} | failed to fetch full offer data")
             else:
-                logging.info(f"Oferta {id} istnieje w bazie, sprawdzanie czy zmieniła się cena...")
+                logging.info(f"offer {id} already in db, checking price...")
                 id_db, new_price, new_price_per_m = check_if_price_changed(offer, cur)
-                # Jezeli new_price to nie False tylko liczba tzn ze cena sie zmienila - update bazy
 
                 if new_price:
                     update_active_offers((id_db, new_price, new_price_per_m), conn, cur)
-                    b_n+=1
-                    logging.info(f"Update ceny oferty {id} w bazie zakonczony")
+                    b_n += 1
+                    logging.info(f"offer {id} price updated")
 
         logger.info("-----------------------------------------")
-        logger.info(f": {a_n} ofert")
-        logger.info(f"Update cen w bazie dotyczyl: {b_n} ofert")
+        logger.info(f"new offers saved: {a_n}")
+        logger.info(f"price updates: {b_n}")
         logger.info("-----------------------------------------")
 
-        # Na koncu sprawdz, czy sa jakies usuniete oferty
-        logging.info("Rozpoczynam sprawdzanie czy czy jakieś oferty nie zostały usunięte z otodom...")
-        deleted_offers = find_closed_offers(all_offers_basic_from_sarching_page, city,cur)
-        logging.info("Rozpocznynam update ofert w bazie, które zostały usunięte...")
-        for deletd_offer in deleted_offers:
-            update_deleted_offers(deletd_offer, conn, cur)
-        
-        logging.info("Zakończono")
-            
+        logging.info("checking for deleted offers...")
+        deleted_offers = find_closed_offers(all_offers_basic_from_sarching_page, city, cur)
+        logging.info("updating deleted offers in db...")
+        for deleted_offer in deleted_offers:
+            update_deleted_offers(deleted_offer, conn, cur)
+
+        logging.info("done")
+
     except Exception as error:
-        logging.exception("Error in main fucntion:")
+        logging.exception("error in main function:")
     finally: 
         if conn:
             cur.close()

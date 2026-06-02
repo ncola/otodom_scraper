@@ -2,17 +2,14 @@ import psycopg2, os, logging
 from dotenv import load_dotenv
 
 
-# Wymagany zainstalowany PostgreSQL oraz utworzona baza apartments_for_sale
-# Utworzenie bazy:
+# requires PostgreSQL running and a database named apartments_for_sale_otodom
+# to create it manually:
 # psql -U postgres
-# CREATE DATABASE apartments_for_sale;
+# CREATE DATABASE apartments_for_sale_otodom;
 
-
-# załadowanie zmiennych środowiskowych z .env
 load_dotenv()
 
 
-# ustawienie połączenia z bazą danych 
 def get_db_connection():
     """
     Establishes a connection to the PostgreSQL database using credentials from environment variables
@@ -37,7 +34,7 @@ def get_db_connection():
         port=os.getenv('DB_PORT')
 
         if not all([host, dbname, user, password, port]):
-            raise ValueError("Brak wymaganych zmiennych środowiskowych do połączenia z bazą danych")
+            raise ValueError("missing required env variables for db connection")
         
         connection = psycopg2.connect(
             host=host,
@@ -47,10 +44,10 @@ def get_db_connection():
             port=port
         )
 
-        logging.debug(f"Connected to database {os.getenv('DB_NAME')}")
+        logging.debug(f"connected to database: {os.getenv('DB_NAME')}")
         return connection
     except Exception as error:
-        logging.debug(f"Error while connecting to database: {error}")
+        logging.error(f"error connecting to database: {error}")
     return connection
 
 
@@ -62,9 +59,9 @@ def check_table_exists(cur, table_name):
                 WHERE table_schema = 'public'
                 AND table_name = %s);
                 """
-            cur.execute(checking_query, (table_name,)) #argumenty w zapytaniach muszą byv przekazane jako krotka lub lista
+            cur.execute(checking_query, (table_name,))
             result = cur.fetchone()
-            return result[0] # true/false
+            return result[0]  # True/False
 
 
 def create_tables(cur):
@@ -96,10 +93,10 @@ def create_tables(cur):
                         cur.execute(command.strip())
 
                 cur.connection.commit()
-                logging.info(f"Tables {tables} created")
+                logging.info(f"tables created: {tables}")
             except Exception as error:
-                logging.exception(f"Error during creating tables: {error}")
+                logging.exception(f"error creating tables: {error}")
 
     except Exception as error:
-        logging.exception(f"Error during creating tables in database: {error}")
+        logging.exception(f"error during table setup: {error}")
 

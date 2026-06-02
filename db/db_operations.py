@@ -29,20 +29,20 @@ def insert_into_locations_table(cur, offer_data):
                            offer_data['district'])
         
 
-        logging.debug(f"Czy lokalizacja {location_values} znajduje się już w locations?: NIE")
+        logging.debug(f"location {location_values} not in db, inserting")
 
         location_query = """
             INSERT INTO locations (voivodeship, city, district)
             VALUES (%s, %s, %s)
             RETURNING id
             ;"""
-        
+
         cur.execute(location_query, location_values)
         new_id = cur.fetchone()[0]
-        logging.debug(f"Nadane ID lokalizacji w tabeli locations: {new_id}")
-        
+        logging.debug(f"location inserted with id: {new_id}")
+
     else:
-        logging.debug(f"Czy lokalizacja znajduje się już w locations?: TAK, pod id {location_result}")
+        logging.debug(f"location already in db under id: {location_result}")
 
 
 created_offer_id = None
@@ -50,7 +50,7 @@ created_offer_id = None
 def insert_into_apartments_sale_listings_table(cur, offer_data):
     location_id = check_location_table(cur, offer_data)
     if location_id is None:
-        raise ValueError(f"Nie znaleziono lokalizacji w bazie dla oferty {offer_data.get('listing_id')}. Upewnij się, że lokalizacja została wcześniej wstawiona.")
+        raise ValueError(f"location not found in db for offer {offer_data.get('listing_id')} — make sure it was inserted first")
     listing_query = """
         INSERT INTO apartments_sale_listings (otodom_listing_id, title, market, advert_type, 
         creation_date, creation_time, pushed_up_at, exclusive_offer, creation_source, description_text, 
@@ -76,9 +76,9 @@ def insert_into_apartments_sale_listings_table(cur, offer_data):
                       offer_data['description_text'],
                       offer_data['area'],
                       offer_data['price'],
-                      offer_data['price'], # przy pierwszym wprowadzeniu podajemy tą samą cene
+                      offer_data['price'],  # updated_price = price on first insert
                       offer_data['price_per_m'],
-                      offer_data['price_per_m'], # przy pierwszym wprowadzeniu podajemy tą samą cene
+                      offer_data['price_per_m'],  # updated_price_per_m = price_per_m on first insert
                       location_id[0],
                       offer_data['street'],
                       offer_data['rent_amount'],
@@ -165,14 +165,14 @@ def insert_new_listing(offer_data, conn, cur):
         # TABELA photos
         #insert_into_photos_table(cur, offer_data, created_offer_id)
 
-        logging.debug(f"Oferta zapisana w bazie pod id = {created_offer_id}")
+        logging.debug(f"offer saved to db with id: {created_offer_id}")
 
         conn.commit()
-        
+
         return created_offer_id
-    
+
     except Exception as error:
-        logging.exception(f"Error during inserting new listing: {error}")
+        logging.exception(f"error inserting new listing: {error}")
 
 
 def update_price_in_listings_table(offer_data, cur):
@@ -188,9 +188,9 @@ def update_price_in_listings_table(offer_data, cur):
         update_price_values = (new_price, new_price_per_m, id)
         cur.execute(update_price_query, update_price_values)
         
-        logging.debug(f"BAZA: update oferty {id} w apartments_sale_listings: nowa cena - {new_price}, nowa cena za m2 - {new_price_per_m}")
+        logging.debug(f"offer {id} price updated — new price: {new_price}, new price per m2: {new_price_per_m}")
     except Exception as error:
-        logging.exception(f"Error during updating price in listings_table: {error}")
+        logging.exception(f"error updating price in listings table: {error}")
 
 
 def update_price_in_history_table(offer_data, cur):
@@ -217,10 +217,10 @@ def update_price_in_history_table(offer_data, cur):
         cur.execute(insert_history_query, update_history_values)
         id_history_table = cur.fetchone()[0]
 
-        logging.debug(f"BAZA: update oferty {id} w price_history pod id {id_history_table}")
+        logging.debug(f"offer {id} price history saved with id: {id_history_table}")
 
     except Exception as error:
-        logging.exception(f"Error during updating price in price_history table: {error}")
+        logging.exception(f"error updating price history table: {error}")
 
 
 def update_active_offers(offer_data, conn, cur):
@@ -231,7 +231,7 @@ def update_active_offers(offer_data, conn, cur):
         conn.commit()
         
     except Exception as error:
-        logging.exception(f"Error during updating active offers: {error}")
+        logging.exception(f"error updating active offers: {error}")
  
 
 def update_deleted_offers(offer_data, conn, cur):
@@ -252,10 +252,10 @@ def update_deleted_offers(offer_data, conn, cur):
         update_inactive_values = (False, current_date, id_db)
         cur.execute(update_inactive_query, update_inactive_values)
 
-        logging.debug(f"W ofercie {id_db} zmieniono wartość 'active' na 'false' z datą {current_date} w kolumnie 'detected_inactive_at")
+        logging.debug(f"offer {id_db} marked as inactive on {current_date}")
 
         conn.commit()
-        
+
     except Exception as error:
-        logging.exception(f"Error during updating deleted offers: {error}")
+        logging.exception(f"error updating deleted offers: {error}")
 

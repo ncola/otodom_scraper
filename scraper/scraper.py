@@ -21,7 +21,7 @@ def is_allowed_to_scrape(url: str) -> bool:
         return rp.can_fetch("*", url)
 
     except requests.exceptions.RequestException as e:
-        print(f"Błąd podczas pobierania robots.txt: {e}")
+        logging.warning(f"error fetching robots.txt: {e}")
         return False
 
 
