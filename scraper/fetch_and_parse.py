@@ -366,29 +366,23 @@ def find_offer_link(potentially_deleted_data: set, cur) -> set:
         set: A set of tuples containing (offer_id_from_db, offer_link)
 
     """
+    check_potentially_deleted_query = """
+        SELECT offer_link
+        FROM apartments_sale_listings
+        WHERE id = %s
+        ;"""
+
     logging.debug("fetching links for potentially deleted offers")
-
-    if not potentially_deleted_data:
-        return set()
-
-    cur.execute(
-        "SELECT id, offer_link FROM apartments_sale_listings WHERE id = ANY(%s)",
-        (list(potentially_deleted_data),)
-    )
-    rows = cur.fetchall()
-
     links = set()
-    fetched_ids = set()
-    for id_from_db, offer_link in rows:
-        fetched_ids.add(id_from_db)
-        if offer_link is None:
+    for id_from_db in potentially_deleted_data:
+        cur.execute(check_potentially_deleted_query, (id_from_db,))
+        row = cur.fetchone()
+        if row is None:
             logging.warning(f"no link found for offer {id_from_db}, skipping")
             continue
+        offer_link = row[0]
         links.add((id_from_db, offer_link))
         logging.debug(f"offer {id_from_db}: {offer_link}")
-
-    for id_from_db in potentially_deleted_data - fetched_ids:
-        logging.warning(f"no link found for offer {id_from_db}, skipping")
 
     return links
 
