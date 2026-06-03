@@ -25,7 +25,9 @@ services:
     depends_on:
       db:
         condition: service_healthy        
-    restart: "no"                         
+    restart: "no"
+    volumes:
+      - ./logs:/app/logs
 
 volumes:
   otodom_pgdata:
