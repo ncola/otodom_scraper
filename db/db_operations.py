@@ -172,6 +172,7 @@ def insert_new_listing(offer_data, conn, cur):
         return created_offer_id
 
     except Exception as error:
+        conn.rollback()
         logging.exception(f"error inserting new listing: {error}")
 
 
@@ -231,6 +232,7 @@ def update_active_offers(offer_data, conn, cur):
         conn.commit()
         
     except Exception as error:
+        conn.rollback()
         logging.exception(f"error updating active offers: {error}")
  
 
