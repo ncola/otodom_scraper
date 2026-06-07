@@ -4,8 +4,6 @@
 
 This project is a web scraping tool designed to automatically collect real estate data from Otodom, a popular property listing platform. The scraper automates the process of extracting property listings and their associated data, which is then stored in a PostgreSQL database for further analysis
 
-🔄 Status of the project: in progress
-
 The project is currently tailored for scraping only real estate listings related to apartment sales in a specific city
 
 ⚠️ **Built only for personal use, for learning and portfolio purposes. I do not recommend using this code for anything other than learning**
@@ -27,28 +25,15 @@ The database is designed to store apartment listings data, price history, photos
 
 ![Database Structure](imgs/db_structure.png)
 
-## 🚀 Running with Docker (recommended)
+## 🚀 Running options
+### 1️⃣ Running with Docker (recommended)
 
 The easiest way to run the project is with Docker — no need to install PostgreSQL manually.
 
 **Requirements:** [Docker Desktop](https://www.docker.com/products/docker-desktop) installed and running.
 
-**1. Create your `.env` file** (copy from the example and fill in your password):
+**1. Create your `.env` file** (copy from the example and fill in your password)
 
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
-```
-DB_HOST=db
-DB_PORT=5432
-DB_NAME=apartments_for_sale_otodom
-DB_USER=postgres
-DB_PASSWORD=your_password_here
-```
-
-> ⚠️ Never commit `.env` to git — it contains your credentials. It is already listed in `.gitignore`.
 
 **2. Build and run:**
 
@@ -76,7 +61,7 @@ docker compose down
 > 💡 Database data is stored in a Docker volume (`otodom_pgdata`) and persists between runs. To wipe the data completely: `docker compose down -v`
 
 
-## 🛠 Running locally (alternative)
+### 2️⃣ Running locally (alternative)
 
 If you prefer to run without Docker, you need **PostgreSQL** installed and a database created:
 
@@ -94,6 +79,30 @@ pip install -r requirements.txt
 python3 main.py
 ```
 
+### 3️⃣ Running with GitHub Actions and Neon (new)
+
+This project can be also run automatically once per day using GitHub Actions.
+
+Required repository secrets:
+
+- `DB_HOST`
+- `DB_PORT`
+- `DB_NAME`
+- `DB_USER`
+- `DB_PASSWORD`
+
+The database should be an external PostgreSQL instance, for example Neon.
+
+The scheduled workflow is defined in:
+
+```text
+.github/workflows/daily-scraper.yml
+```
+It can also be triggered manually from:
+```
+GitHub → Actions → Daily Otodom Scraper → Run workflow
+```
+Application logs are uploaded as GitHub Actions artifacts after each run.
 
 ## 🔑 Environment Variables
 
@@ -104,6 +113,6 @@ All configuration is done via `.env` file in the project root. See `.env.example
 
 ## 📝 Logging
 
-Database operations are logged using Python's logging module. Logs are saved to the logs/ directory and can be adjusted via config/logging_config.py
+Database operations are logged using Python's logging module. Logs are saved to the logs/ directory and can be adjusted via `config/logging_config.py`. If you are using  option 3 with Guthub Actions the logs are stored as GitHub Actions artifacts after each run.
 
 
