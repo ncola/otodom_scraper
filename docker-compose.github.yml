@@ -1,33 +1,7 @@
 services:
-
-  db:
-    image: postgres:16
-    container_name: otodom_db
-    env_file: .env                        
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
-    ports:
-      - "5433:5432"
-    volumes:
-      - otodom_pgdata:/var/lib/postgresql/data  
-    healthcheck:                         
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   scraper:
-    build: .                              
-    container_name: otodom_scraper
-    env_file: .env                        
-    depends_on:
-      db:
-        condition: service_healthy        
+    build: .
+    env_file: .env
     restart: "no"
     volumes:
       - ./logs:/app/logs
-
-volumes:
-  otodom_pgdata:
