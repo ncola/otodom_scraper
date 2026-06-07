@@ -102,3 +102,21 @@ def create_tables(cur):
     except Exception as error:
         logging.exception(f"error during table setup: {error}")
 
+def run_migrations(cur):
+    cur.execute("""
+        ALTER TABLE apartments_sale_listings
+        ADD COLUMN IF NOT EXISTS db_created_at TIMESTAMP
+        NOT NULL DEFAULT CURRENT_TIMESTAMP
+    """)
+
+    cur.execute("""
+        ALTER TABLE apartments_sale_listings
+        ADD COLUMN IF NOT EXISTS db_updated_at TIMESTAMP
+        NOT NULL DEFAULT CURRENT_TIMESTAMP
+    """)
+
+    cur.execute("""
+        ALTER TABLE price_history
+        ADD COLUMN IF NOT EXISTS db_created_at TIMESTAMP
+        NOT NULL DEFAULT CURRENT_TIMESTAMP
+    """)

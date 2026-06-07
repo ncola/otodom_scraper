@@ -6,7 +6,7 @@ if scraper_path not in sys.path:
 
 from scraper.scraper import is_allowed_to_scrape, scrape_offer
 from scraper.fetch_and_parse import download_data_from_search_results, check_if_offer_exists, check_if_price_changed, find_closed_offers
-from db.db_setup import create_tables
+from db.db_setup import create_tables, run_migrations
 from db.db_operations import insert_new_listing, update_active_offers, update_deleted_offers, get_db_connection
 
 from dotenv import load_dotenv
@@ -32,14 +32,12 @@ def main(url, city):
             return
         cur=conn.cursor()
         
-        # Upewnij się, ze to dozwolone
         result = is_allowed_to_scrape(url)
         logging.info(f"scraping allowed: {result}")
 
-        # Utwórz tabele jezeli nie istnieją
         create_tables(cur)
+        run_migrations(cur)
 
-        # pobierz dane
         logging.info("fetching basic data from search results...")
         all_offers_basic_from_sarching_page = download_data_from_search_results(url)
 

@@ -182,7 +182,10 @@ def update_price_in_listings_table(offer_data, cur):
 
         update_price_query = """
             UPDATE apartments_sale_listings
-            SET updated_price = %s, updated_price_per_m = %s
+            SET 
+                updated_price = %s, 
+                updated_price_per_m = %s,
+                db_updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
             ;"""
 
@@ -245,7 +248,10 @@ def update_deleted_offers(offer_data, conn, cur):
 
         update_inactive_query = """
         UPDATE apartments_sale_listings
-        SET active = %s, detected_inactive_at = %s
+        SET
+            active = %s,
+            detected_inactive_at = %s,
+            db_updated_at = CURRENT_TIMESTAMP
         WHERE id = %s
         ;"""
 
