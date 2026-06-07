@@ -32,6 +32,7 @@ def get_db_connection():
         user=os.getenv('DB_USER')
         password=os.getenv('DB_PASSWORD')
         port=os.getenv('DB_PORT')
+        sslmode=os.getenv("DB_SSLMODE", "require")
 
         if not all([host, dbname, user, password, port]):
             raise ValueError("missing required env variables for db connection")
@@ -41,7 +42,8 @@ def get_db_connection():
             dbname=dbname,
             user=user,
             password=password,
-            port=port
+            port=port,
+            sslmode=sslmode
         )
 
         logging.debug(f"connected to database: {os.getenv('DB_NAME')}")
