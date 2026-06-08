@@ -94,7 +94,7 @@ def transform_data(listing: ListingFull) -> ListingFull:
         .replace("cable-television", "cable_television")
     )
 
-    # surowe pola scalone w features — już niepotrzebne
+    # raw feature fields merged into features string — no longer needed
     listing.features_additional_information = None
     listing.features_equipment = None
     listing.features_utilities = None

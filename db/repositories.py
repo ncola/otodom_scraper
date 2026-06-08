@@ -4,7 +4,7 @@ import logging
 from domain.models import ListingBasic, ListingFull
 
 
-# ---------- location ----------
+# ---------- locations table ----------
 
 def check_location_table(cur, listing: ListingFull):
     location_query = """
@@ -32,7 +32,7 @@ def insert_into_locations_table(cur, listing: ListingFull):
         logging.debug(f"location already in db under id: {location_result}")
 
 
-# ---------- listings ----------
+# ---------- apartments_sale_listings table ----------
 
 def insert_into_apartments_sale_listings_table(cur, listing: ListingFull) -> int:
     location_id = check_location_table(cur, listing)
@@ -107,14 +107,14 @@ def insert_new_listing(listing: ListingFull, conn, cur) -> int:
         logging.exception(f"error inserting new listing: {error}")
 
 
-# ---------- price updates ----------
+# ---------- price_history table ----------
 
 def update_active_offers(offer_data, conn, cur):
     try:
         id, new_price, new_price_per_m = offer_data
         change_date = datetime.date.today()
 
-        # read old price before overwriting
+        # must read old price before overwriting updated_price
         cur.execute("SELECT updated_price FROM apartments_sale_listings WHERE id = %s", (id,))
         old_price = cur.fetchone()[0]
 
@@ -159,7 +159,7 @@ def update_deleted_offers(offer_data, conn, cur):
         logging.exception(f"error updating deleted offers: {error}")
 
 
-# ---------- checks ----------
+# ---------- checks (cross-table queries used by the service layer) ----------
 
 def check_if_offer_exists(offer: ListingBasic, cur) -> bool:
     try:
