@@ -1,6 +1,6 @@
 import logging
 
-from domain.models import ListingBasic
+from domain.models import ListingBasic, ListingFull
 from scraping.client import fetch_page, is_allowed_to_scrape
 from scraping.search_page import download_data_from_search_results
 from scraping.listing_page import download_data_from_listing_page, get_offer_status
@@ -13,17 +13,22 @@ from config.logging_config import setup_failed_offers_logger
 failed_logger = setup_failed_offers_logger()
 
 
-def _scrape_offer(offer: ListingBasic) -> dict | None:
+def _scrape_offer(offer: ListingBasic) -> ListingFull | None:
+    """Fetches and normalizes a single listing page.
+
+    Returns a ListingFull DTO - a single object holding data that will later
+    be split across locations, apartments_sale_listings and features tables.
+    """
     offer_url = offer.link
     id = offer.listing_id
 
     for attempt in range(1, 3):
         try:
             response = fetch_page(offer_url)
-            offer_data = download_data_from_listing_page(response)
-            cleaned_offer_data = transform_data(offer_data)
+            listing_full = download_data_from_listing_page(response)
+            normalized = transform_data(listing_full)
             logging.debug(f"offer {id} fetched successfully")
-            return cleaned_offer_data
+            return normalized
         except Exception as error:
             logging.warning(f"attempt {attempt}/2 failed for offer {id}: {error}")
             if attempt == 2:
