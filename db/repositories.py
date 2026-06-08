@@ -117,47 +117,31 @@ def insert_new_listing(offer_data, conn, cur):
 
 # ---------- price updates ----------
 
-def update_price_in_listings_table(offer_data, cur):
+def update_active_offers(offer_data, conn, cur):
     try:
         id, new_price, new_price_per_m = offer_data
-        update_price_query = """
+        change_date = datetime.date.today()
+
+        # read old price before overwriting
+        cur.execute("SELECT updated_price FROM apartments_sale_listings WHERE id = %s", (id,))
+        old_price = cur.fetchone()[0]
+
+        cur.execute("""
             UPDATE apartments_sale_listings
             SET
                 updated_price = %s,
                 updated_price_per_m = %s,
                 db_updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
-            ;"""
-        cur.execute(update_price_query, (new_price, new_price_per_m, id))
+            ;""", (new_price, new_price_per_m, id))
         logging.debug(f"offer {id} price updated — new price: {new_price}, new price per m2: {new_price_per_m}")
-    except Exception as error:
-        logging.exception(f"error updating price in listings table: {error}")
 
-
-def update_price_in_history_table(offer_data, cur):
-    try:
-        id, new_price, _ = offer_data
-        change_date = datetime.date.today()
-
-        cur.execute("SELECT price FROM apartments_sale_listings WHERE id = %s", (id,))
-        old_price = cur.fetchone()[0]
-
-        insert_history_query = """
+        cur.execute("""
             INSERT INTO price_history (listing_id, old_price, new_price, change_date)
             VALUES (%s, %s, %s, %s)
-            RETURNING id
-            ;"""
-        cur.execute(insert_history_query, (id, old_price, new_price, change_date))
-        id_history_table = cur.fetchone()[0]
-        logging.debug(f"offer {id} price history saved with id: {id_history_table}")
-    except Exception as error:
-        logging.exception(f"error updating price history table: {error}")
+            """, (id, old_price, new_price, change_date))
+        logging.debug(f"offer {id} price history saved: {old_price} → {new_price}")
 
-
-def update_active_offers(offer_data, conn, cur):
-    try:
-        update_price_in_listings_table(offer_data, cur)
-        update_price_in_history_table(offer_data, cur)
         conn.commit()
     except Exception as error:
         conn.rollback()
@@ -183,7 +167,7 @@ def update_deleted_offers(offer_data, conn, cur):
         logging.exception(f"error updating deleted offers: {error}")
 
 
-# ---------- checks (previously in scraping layer) ----------
+# ---------- checks ----------
 
 def check_if_offer_exists(offer: dict, cur) -> bool:
     try:
