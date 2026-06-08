@@ -102,6 +102,8 @@ def transform_data(listing: ListingFull) -> ListingFull:
 
     listing.energy_certificate = extract_text(listing.energy_certificate)
     listing.description_text = clean_text(listing.description_text)
+    listing.building_build_year = clear_numbers(listing.building_build_year, val='int')
+    listing.building_floors_num = clear_numbers(listing.building_floors_num, val='int')
 
     if listing.creation_date:
         creation_dt = datetime.strptime(listing.creation_date, '%Y-%m-%dT%H:%M:%S%z')

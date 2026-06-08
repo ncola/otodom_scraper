@@ -6,6 +6,11 @@ from scraping.client import fetch_page
 from domain.models import ListingFull
 
 
+def _str(val) -> str | None:
+    """Converts value to string, but returns None instead of the string 'None'."""
+    return str(val) if val is not None else None
+
+
 def download_data_from_listing_page(html_response) -> dict:
     if html_response is None:
         raise Exception("html response is None, can't parse listing page")
@@ -20,15 +25,18 @@ def download_data_from_listing_page(html_response) -> dict:
         listing_id = offer_data.get("id", None)
         listing_title = offer_data.get("title", None)
         listing_title = BeautifulSoup(listing_title, "html.parser").get_text()
-        market_type = str(offer_data.get("market", None)).lower()
-        advertisement_type = str(offer_data.get("advertType", None)).lower()
+        market_raw = offer_data.get("market")
+        market_type = market_raw.lower() if market_raw is not None else None
+        advert_raw = offer_data.get("advertType")
+        advertisement_type = advert_raw.lower() if advert_raw is not None else None
         creation_date = offer_data.get("createdAt", None)
         description = offer_data.get("description", None)
         description_text = BeautifulSoup(description, "html.parser").get_text()
         is_exclusive_offer = offer_data.get("exclusiveOffer", None)
-        creation_source = str(offer_data.get("creationSource", None))
+        creation_source = _str(offer_data.get("creationSource"))
         promoted_at = offer_data.get("pushedUpAt", None)
-        heating_type = str(offer_data.get("property", {}).get("buildingProperties", {}).get("heating", None)).lower()
+        heating_raw = offer_data.get("property", {}).get("buildingProperties", {}).get("heating")
+        heating_type = heating_raw.lower() if heating_raw is not None else None
 
         target = offer_data.get("target", {})
         features_equipment = target.get("Equipment_types", None)
@@ -38,7 +46,7 @@ def download_data_from_listing_page(html_response) -> dict:
         area = target.get("Area", None)
         building_build_year = target.get("Build_year", None)
         building_floors_count = target.get("Building_floors_num", None)
-        building_material = str(target.get("Building_material", None))
+        building_material = _str(target.get("Building_material"))
 
         characteristics = offer_data.get("characteristics", {})
         ownership = None
@@ -47,22 +55,20 @@ def download_data_from_listing_page(html_response) -> dict:
                 ownership = characteristic.get("localizedValue", None)
                 break
 
-        building_type = str(target.get("Building_type", None))
+        building_type = _str(target.get("Building_type"))
         energy_certificate = target.get("Energy_certificate", None)
         city = target.get("City", None)
         voivodeship = target.get("Province", None)
 
-        construction_status = str(target.get("Construction_status", None))
-        floor_num = str(target.get("Floor_no", None))
+        construction_status = _str(target.get("Construction_status"))
+        floor_num = _str(target.get("Floor_no"))
         price = target.get("Price", None)
         price_per_m = target.get("Price_per_m", None)
         proper_type = target.get("ProperType", None)
         rent = target.get("Rent", None)
-        windows_type = str(target.get("Windows_type", None))
-        security_types = str(target.get("Security_types", None))
-        if isinstance(security_types, list):
-            security_types = ', '.join(data for data in security_types)
-        rooms_num = str(target.get("Rooms_num", None))
+        windows_type = _str(target.get("Windows_type"))
+        security_types = _str(target.get("Security_types"))
+        rooms_num = _str(target.get("Rooms_num"))
 
         location_data = offer_data.get("location", {}).get("address", {})
         if location_data:
