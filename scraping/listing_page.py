@@ -1,0 +1,164 @@
+import json
+import logging
+from bs4 import BeautifulSoup
+
+from scraping.client import fetch_page
+
+
+def download_data_from_listing_page(html_response) -> dict:
+    if html_response is None:
+        raise Exception("html response is None, can't parse listing page")
+
+    soup = BeautifulSoup(html_response.text, 'html.parser')
+    script_tag = soup.find('script', {'id': '__NEXT_DATA__'})
+
+    if script_tag:
+        json_data = json.loads(script_tag.string)
+        offer_data = json_data.get("props", {}).get("pageProps", {}).get("ad", {})
+
+        listing_id = offer_data.get("id", None)
+        listing_title = offer_data.get("title", None)
+        listing_title = BeautifulSoup(listing_title, "html.parser").get_text()
+        market_type = str(offer_data.get("market", None)).lower()
+        advertisement_type = str(offer_data.get("advertType", None)).lower()
+        creation_date = offer_data.get("createdAt", None)
+        description = offer_data.get("description", None)
+        description_text = BeautifulSoup(description, "html.parser").get_text()
+        is_exclusive_offer = offer_data.get("exclusiveOffer", None)
+        creation_source = str(offer_data.get("creationSource", None))
+        promoted_at = offer_data.get("pushedUpAt", None)
+        heating_type = str(offer_data.get("property", {}).get("buildingProperties", {}).get("heating", None)).lower()
+
+        target = offer_data.get("target", {})
+        features_equipment = target.get("Equipment_types", None)
+        features_additional_information = target.get("Extras_types", None)
+        features_utilities = target.get("Media_types", None)
+
+        area = target.get("Area", None)
+        building_build_year = target.get("Build_year", None)
+        building_floors_count = target.get("Building_floors_num", None)
+        building_material = str(target.get("Building_material", None))
+
+        characteristics = offer_data.get("characteristics", {})
+        ownership = None
+        for characteristic in characteristics:
+            if characteristic["key"] == "building_ownership":
+                ownership = characteristic.get("localizedValue", None)
+                break
+
+        building_type = str(target.get("Building_type", None))
+        energy_certificate = target.get("Energy_certificate", None)
+        city = target.get("City", None)
+        voivodeship = target.get("Province", None)
+
+        construction_status = str(target.get("Construction_status", None))
+        floor_num = str(target.get("Floor_no", None))
+        price = target.get("Price", None)
+        price_per_m = target.get("Price_per_m", None)
+        proper_type = target.get("ProperType", None)
+        rent = target.get("Rent", None)
+        windows_type = str(target.get("Windows_type", None))
+        security_types = str(target.get("Security_types", None))
+        if isinstance(security_types, list):
+            security_types = ', '.join(data for data in security_types)
+        rooms_num = str(target.get("Rooms_num", None))
+
+        location_data = offer_data.get("location", {}).get("address", {})
+        if location_data:
+            street = location_data.get("street", {}).get("name", None) if location_data.get("street") else None
+        else:
+            street = None
+
+        reverseGeocoding_locations = offer_data.get("location", {}).get("reverseGeocoding", {}).get("locations", [])
+        district = None
+        for data in reverseGeocoding_locations:
+            if data.get("locationLevel") == "district":
+                district = data.get("name")
+                break
+
+        links = offer_data.get("links", {})
+        local_plan_url = links.get("localPlanUrl", None)
+        video_url = links.get("videoUrl", None)
+        view3d_url = links.get("view3dUrl", None)
+        walkaround_url = links.get("walkaroundUrl", None)
+
+        development_id = offer_data.get("developmentId", None)
+        development_title = offer_data.get("developmentTitle", None)
+        seller = offer_data.get("owner", {})
+        owner_id = seller.get("id", None)
+        owner_name = seller.get("name", None)
+
+        agency = offer_data.get("agency", {})
+        if agency:
+            agency_id = agency.get("id", None)
+            agency_name = agency.get("name", None)
+        else:
+            agency_id = None
+            agency_name = None
+
+        data = {}
+        data["listing_id"] = listing_id
+        data["title"] = listing_title
+        data["market"] = market_type
+        data["advert_type"] = advertisement_type
+        data["creation_date"] = creation_date
+        data["pushed_up_at"] = promoted_at
+        data["exclusive_offer"] = is_exclusive_offer
+        data["creation_source"] = creation_source
+        data["description_text"] = description_text
+        data["area"] = area
+        data["price"] = price
+        data["price_per_m"] = price_per_m
+        data["rent_amount"] = rent
+        data["rooms_num"] = rooms_num
+        data["floor_num"] = floor_num
+        data["heating"] = heating_type
+        data["ownership"] = ownership
+        data["proper_type"] = proper_type
+        data["construction_status"] = construction_status
+        data["features_utilities"] = features_utilities
+        data["features_equipment"] = features_equipment
+        data["features_additional_information"] = features_additional_information
+        data["energy_certificate"] = energy_certificate
+        data["voivodeship"] = voivodeship
+        data["city"] = city
+        data["district"] = district
+        data["street"] = street
+        data["building_build_year"] = building_build_year
+        data["building_floors_num"] = building_floors_count
+        data["building_material"] = building_material
+        data["building_type"] = building_type
+        data["windows_type"] = windows_type
+        data["security_types"] = security_types
+        data["local_plan_url"] = local_plan_url
+        data["video_url"] = video_url
+        data["view3d_url"] = view3d_url
+        data["walkaround_url"] = walkaround_url
+        data["development_id"] = development_id
+        data["development_title"] = development_title or None
+        data["owner_id"] = None if owner_id == 0 else owner_id
+        data["owner_name"] = owner_name
+        data["agency_id"] = agency_id
+        data["agency_name"] = agency_name
+        data["offer_link"] = f"https://www.otodom.pl/pl/oferta/{offer_data.get('slug', '')}"
+        data['active'] = True
+
+        return data
+
+
+def get_offer_status(offer_link: str) -> str:
+    try:
+        html_response = fetch_page(offer_link)
+        if html_response is None:
+            return "removed"
+
+        soup = BeautifulSoup(html_response.text, 'html.parser')
+        script_tag = soup.find('script', {'id': '__NEXT_DATA__'})
+        if script_tag:
+            json_data = json.loads(script_tag.string)
+            status = json_data.get("props", {}).get("pageProps", {}).get("ad", {}).get("status", None)
+            return status
+
+    except Exception as error:
+        logging.exception(f"error during getting offer status: {error}")
+        return "removed"

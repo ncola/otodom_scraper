@@ -1,7 +1,7 @@
 import logging
+import os
 
-from scraper.fetch_and_parse import fetch_page
-
+from scraping.client import fetch_page
 
 os.makedirs("logs", exist_ok=True)
 
