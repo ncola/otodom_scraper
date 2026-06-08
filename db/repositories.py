@@ -34,10 +34,60 @@ def insert_into_locations_table(cur, listing: ListingFull):
 
 # ---------- apartments_sale_listings table ----------
 
+def _build_listing_params(listing: ListingFull, location_id: int) -> dict:
+    return {
+        "otodom_listing_id": listing.listing_id,
+        "title": listing.title,
+        "market": listing.market,
+        "advert_type": listing.advert_type,
+        "creation_date": listing.creation_date,
+        "creation_time": listing.creation_time,
+        "pushed_up_at": listing.pushed_up_at,
+        "exclusive_offer": listing.exclusive_offer,
+        "creation_source": listing.creation_source,
+        "description_text": listing.description_text,
+        "area": listing.area,
+        "price": listing.price,
+        "updated_price": listing.price,
+        "price_per_m": listing.price_per_m,
+        "updated_price_per_m": listing.price_per_m,
+        "location_id": location_id,
+        "street": listing.street,
+        "rent_amount": listing.rent_amount,
+        "rooms_num": listing.rooms_num,
+        "floor_num": listing.floor_num,
+        "heating": listing.heating,
+        "ownership": listing.ownership,
+        "proper_type": listing.proper_type,
+        "construction_status": listing.construction_status,
+        "energy_certificate": listing.energy_certificate,
+        "building_build_year": listing.building_build_year,
+        "building_floors_num": listing.building_floors_num,
+        "building_material": listing.building_material,
+        "building_type": listing.building_type,
+        "windows_type": listing.windows_type,
+        "local_plan_url": listing.local_plan_url,
+        "video_url": listing.video_url,
+        "view3d_url": listing.view3d_url,
+        "walkaround_url": listing.walkaround_url,
+        "development_id": listing.development_id,
+        "development_title": listing.development_title,
+        "owner_id": listing.owner_id,
+        "owner_name": listing.owner_name,
+        "agency_id": listing.agency_id,
+        "agency_name": listing.agency_name,
+        "offer_link": listing.offer_link,
+        "active": listing.active,
+        "detected_inactive_at": listing.detected_inactive_at,
+    }
+
+
 def insert_into_apartments_sale_listings_table(cur, listing: ListingFull) -> int:
     location_id = check_location_table(cur, listing)
     if location_id is None:
         raise ValueError(f"location not found in db for offer {listing.listing_id} — make sure it was inserted first")
+
+    params = _build_listing_params(listing, location_id[0])
 
     listing_query = """
         INSERT INTO apartments_sale_listings (otodom_listing_id, title, market, advert_type,
@@ -47,28 +97,52 @@ def insert_into_apartments_sale_listings_table(cur, listing: ListingFull) -> int
         building_build_year, building_floors_num, building_material, building_type, windows_type,
         local_plan_url, video_url, view3d_url, walkaround_url, development_id, development_title,
         owner_id, owner_name, agency_id, agency_name, offer_link, active, detected_inactive_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%(otodom_listing_id)s, %(title)s, %(market)s, %(advert_type)s, %(creation_date)s,
+        %(creation_time)s, %(pushed_up_at)s, %(exclusive_offer)s, %(creation_source)s, %(description_text)s,
+        %(area)s, %(price)s, %(updated_price)s, %(price_per_m)s, %(updated_price_per_m)s, %(location_id)s,
+        %(street)s, %(rent_amount)s, %(rooms_num)s, %(floor_num)s, %(heating)s, %(ownership)s,
+        %(proper_type)s, %(construction_status)s, %(energy_certificate)s, %(building_build_year)s,
+        %(building_floors_num)s, %(building_material)s, %(building_type)s, %(windows_type)s,
+        %(local_plan_url)s, %(video_url)s, %(view3d_url)s, %(walkaround_url)s, %(development_id)s,
+        %(development_title)s, %(owner_id)s, %(owner_name)s, %(agency_id)s, %(agency_name)s,
+        %(offer_link)s, %(active)s, %(detected_inactive_at)s)
         RETURNING id
         ;"""
 
-    cur.execute(listing_query, (
-        listing.listing_id, listing.title, listing.market, listing.advert_type,
-        listing.creation_date, listing.creation_time, listing.pushed_up_at,
-        listing.exclusive_offer, listing.creation_source, listing.description_text,
-        listing.area, listing.price, listing.price,       # updated_price = price on first insert
-        listing.price_per_m, listing.price_per_m,         # updated_price_per_m = price_per_m on first insert
-        location_id[0], listing.street, listing.rent_amount, listing.rooms_num,
-        listing.floor_num, listing.heating, listing.ownership, listing.proper_type,
-        listing.construction_status, listing.energy_certificate, listing.building_build_year,
-        listing.building_floors_num, listing.building_material, listing.building_type,
-        listing.windows_type, listing.local_plan_url, listing.video_url,
-        listing.view3d_url, listing.walkaround_url, listing.development_id,
-        listing.development_title, listing.owner_id, listing.owner_name,
-        listing.agency_id, listing.agency_name, listing.offer_link,
-        listing.active, listing.detected_inactive_at,
-    ))
+    cur.execute(listing_query, params)
     return cur.fetchone()[0]
+
+
+def _build_features_bools(features: str) -> dict:
+    present = set((features or '').split())
+    return {
+        'internet': 'internet' in present,
+        'cable_television': 'cable_television' in present,
+        'phone': 'phone' in present,
+        'roller_shutters': 'roller_shutters' in present,
+        'anti_burglary_door': 'anti_burglary_door' in present,
+        'entryphone': 'entryphone' in present,
+        'monitoring': 'monitoring' in present,
+        'alarm': 'alarm' in present,
+        'closed_area': 'closed_area' in present,
+        'furniture': 'furniture' in present,
+        'washing_machine': 'washing_machine' in present,
+        'dishwasher': 'dishwasher' in present,
+        'fridge': 'fridge' in present,
+        'stove': 'stove' in present,
+        'oven': 'oven' in present,
+        'tv': 'tv' in present,
+        'balcony': 'balcony' in present,
+        'usable_room': 'usable_room' in present,
+        'garage': 'garage' in present,
+        'basement': 'basement' in present,
+        'garden': 'garden' in present,
+        'terrace': 'terrace' in present,
+        'lift': 'lift' in present,
+        'two_storey': 'two_storey' in present,
+        'separate_kitchen': 'separate_kitchen' in present,
+        'air_conditioning': 'air_conditioning' in present,
+    }
 
 
 def insert_into_features_table(cur, listing: ListingFull, id: int):
@@ -77,21 +151,16 @@ def insert_into_features_table(cur, listing: ListingFull, id: int):
         anti_burglary_door, entryphone, monitoring, alarm, closed_area, furniture, washing_machine,
         dishwasher, fridge, stove, oven, tv, balcony, usable_room, garage, basement, garden, terrace,
         lift, two_storey, separate_kitchen, air_conditioning)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-        %s, %s, %s, %s, %s, %s)
+        VALUES (%(listing_id)s, %(internet)s, %(cable_television)s, %(phone)s, %(roller_shutters)s,
+        %(anti_burglary_door)s, %(entryphone)s, %(monitoring)s, %(alarm)s, %(closed_area)s,
+        %(furniture)s, %(washing_machine)s, %(dishwasher)s, %(fridge)s, %(stove)s, %(oven)s, %(tv)s,
+        %(balcony)s, %(usable_room)s, %(garage)s, %(basement)s, %(garden)s, %(terrace)s, %(lift)s,
+        %(two_storey)s, %(separate_kitchen)s, %(air_conditioning)s)
         ;"""
 
-    features_offer = list((listing.features or '').split(' '))
-    features_all_possibilities = (
-        'internet', 'cable_television', 'phone', 'roller_shutters',
-        'anti_burglary_door', 'entryphone', 'monitoring', 'alarm',
-        'closed_area', 'furniture', 'washing_machine', 'dishwasher',
-        'fridge', 'stove', 'oven', 'tv', 'balcony', 'usable_room',
-        'garage', 'basement', 'garden', 'terrace', 'lift', 'two_storey',
-        'separate_kitchen', 'air_conditioning'
-    )
-    features_bools = [feature in features_offer for feature in features_all_possibilities]
-    cur.execute(features_query, (id, *features_bools))
+    params = _build_features_bools(listing.features)
+    params['listing_id'] = id
+    cur.execute(features_query, params)
 
 
 def insert_new_listing(listing: ListingFull, conn, cur) -> int:
@@ -130,8 +199,8 @@ def update_active_offers(offer_data, conn, cur):
 
         cur.execute("""
             INSERT INTO price_history (listing_id, old_price, new_price, change_date)
-            VALUES (%s, %s, %s, %s)
-            """, (id, old_price, new_price, change_date))
+            VALUES (%(listing_id)s, %(old_price)s, %(new_price)s, %(change_date)s)
+            """, {"listing_id": id, "old_price": old_price, "new_price": new_price, "change_date": change_date})
         logging.debug(f"offer {id} price history saved: {old_price} → {new_price}")
 
         conn.commit()
@@ -156,6 +225,7 @@ def update_deleted_offers(offer_data, conn, cur):
         logging.debug(f"offer {id_db} marked as inactive on {current_date}")
         conn.commit()
     except Exception as error:
+        conn.rollback()
         logging.exception(f"error updating deleted offers: {error}")
 
 
@@ -179,7 +249,7 @@ def check_if_offer_exists(offer: ListingBasic, cur) -> bool:
             return True
     except Exception as error:
         logging.exception(f"error checking if offer exists in db: {error}")
-        return None
+        return False
 
 
 def check_if_price_changed(offer: ListingBasic, cur) -> tuple:
