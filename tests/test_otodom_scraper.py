@@ -1,10 +1,4 @@
 import logging
-import os
-import sys
-
-scraper_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if scraper_path not in sys.path:
-    sys.path.insert(0, scraper_path)
 
 from scraper.fetch_and_parse import fetch_page
 

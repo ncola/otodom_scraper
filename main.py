@@ -1,8 +1,5 @@
-import os,sys, logging
+import os, logging
 from colorlog import ColoredFormatter
-scraper_path = os.path.join(os.path.dirname(__file__), 'scraper')
-if scraper_path not in sys.path:
-    sys.path.append(scraper_path)
 
 from scraper.scraper import is_allowed_to_scrape, scrape_offer
 from scraper.fetch_and_parse import download_data_from_search_results, check_if_offer_exists, check_if_price_changed, find_closed_offers
