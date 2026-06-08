@@ -1,5 +1,6 @@
 import logging
 
+from domain.models import ListingBasic
 from scraping.client import fetch_page, is_allowed_to_scrape
 from scraping.search_page import download_data_from_search_results
 from scraping.listing_page import download_data_from_listing_page, get_offer_status
@@ -12,9 +13,9 @@ from config.logging_config import setup_failed_offers_logger
 failed_logger = setup_failed_offers_logger()
 
 
-def _scrape_offer(offer: dict) -> dict | None:
-    offer_url = offer.get("link")
-    id = offer.get("listing_id")
+def _scrape_offer(offer: ListingBasic) -> dict | None:
+    offer_url = offer.link
+    id = offer.listing_id
 
     for attempt in range(1, 3):
         try:
@@ -74,7 +75,7 @@ def sync(url: str, city: str):
             logging.info("processing offers...")
 
             for offer in all_offers_basic:
-                id = offer.get("listing_id")
+                id = offer.listing_id
                 if len(str(id)) != 8:
                     continue
                 logging.debug(f"checking offer {id}")
@@ -87,7 +88,7 @@ def sync(url: str, city: str):
                         logging.info(f"offer {id} saved to db under id {id_db}")
                     else:
                         logging.warning(f"failed to fetch offer {id}, skipping")
-                        failed_logger.error(f"{id} | {offer.get('link', 'no link')} | failed to fetch full offer data")
+                        failed_logger.error(f"{id} | {offer.link} | failed to fetch full offer data")
                 else:
                     logging.info(f"offer {id} already in db, checking price...")
                     id_db, new_price, new_price_per_m = repo.check_if_price_changed(offer, cur)

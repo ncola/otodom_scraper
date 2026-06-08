@@ -3,6 +3,7 @@ import logging
 from bs4 import BeautifulSoup
 
 from scraping.client import fetch_page
+from domain.models import ListingBasic
 
 
 def get_total_pages(html_response) -> int:
@@ -25,7 +26,7 @@ def get_total_pages(html_response) -> int:
         logging.exception(f"error getting total pages: {error}")
 
 
-def download_data_from_search_results(base_url: str) -> list:
+def download_data_from_search_results(base_url: str) -> list[ListingBasic]:
     try:
         all_offers = []
 
@@ -88,23 +89,23 @@ def download_data_from_search_results(base_url: str) -> list:
                             link = f"https://www.otodom.pl/pl/oferta/{related_offer.get('slug', None)}"
 
                             logging.debug(f"{n}. related offer {id} — area: {area}, price: {price}, price_per_m: {price_per_m}")
-                            all_offers.append({
-                                'listing_id': id,
-                                'area': area,
-                                'price': price,
-                                'price_per_m': price_per_m,
-                                'link': link
-                            })
+                            all_offers.append(ListingBasic(
+                                listing_id=id,
+                                area=area,
+                                price=price,
+                                price_per_m=price_per_m,
+                                link=link
+                            ))
                             n += 1
                     else:
                         logging.debug(f"{n}. offer {listing_id} — area: {area}, price: {price}, price_per_m: {price_per_m}")
-                        all_offers.append({
-                            'listing_id': listing_id,
-                            'area': area,
-                            'price': price,
-                            'price_per_m': price_per_m,
-                            'link': link
-                        })
+                        all_offers.append(ListingBasic(
+                            listing_id=listing_id,
+                            area=area,
+                            price=price,
+                            price_per_m=price_per_m,
+                            link=link
+                        ))
                     n += 1
                 except Exception as error:
                     logging.exception(f"skipped offer {n} on page {page} (id: {listing_id}): {error}")

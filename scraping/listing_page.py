@@ -3,6 +3,7 @@ import logging
 from bs4 import BeautifulSoup
 
 from scraping.client import fetch_page
+from domain.models import ListingFull
 
 
 def download_data_from_listing_page(html_response) -> dict:
@@ -96,54 +97,52 @@ def download_data_from_listing_page(html_response) -> dict:
             agency_id = None
             agency_name = None
 
-        data = {}
-        data["listing_id"] = listing_id
-        data["title"] = listing_title
-        data["market"] = market_type
-        data["advert_type"] = advertisement_type
-        data["creation_date"] = creation_date
-        data["pushed_up_at"] = promoted_at
-        data["exclusive_offer"] = is_exclusive_offer
-        data["creation_source"] = creation_source
-        data["description_text"] = description_text
-        data["area"] = area
-        data["price"] = price
-        data["price_per_m"] = price_per_m
-        data["rent_amount"] = rent
-        data["rooms_num"] = rooms_num
-        data["floor_num"] = floor_num
-        data["heating"] = heating_type
-        data["ownership"] = ownership
-        data["proper_type"] = proper_type
-        data["construction_status"] = construction_status
-        data["features_utilities"] = features_utilities
-        data["features_equipment"] = features_equipment
-        data["features_additional_information"] = features_additional_information
-        data["energy_certificate"] = energy_certificate
-        data["voivodeship"] = voivodeship
-        data["city"] = city
-        data["district"] = district
-        data["street"] = street
-        data["building_build_year"] = building_build_year
-        data["building_floors_num"] = building_floors_count
-        data["building_material"] = building_material
-        data["building_type"] = building_type
-        data["windows_type"] = windows_type
-        data["security_types"] = security_types
-        data["local_plan_url"] = local_plan_url
-        data["video_url"] = video_url
-        data["view3d_url"] = view3d_url
-        data["walkaround_url"] = walkaround_url
-        data["development_id"] = development_id
-        data["development_title"] = development_title or None
-        data["owner_id"] = None if owner_id == 0 else owner_id
-        data["owner_name"] = owner_name
-        data["agency_id"] = agency_id
-        data["agency_name"] = agency_name
-        data["offer_link"] = f"https://www.otodom.pl/pl/oferta/{offer_data.get('slug', '')}"
-        data['active'] = True
-
-        return data
+        return ListingFull(
+            listing_id=listing_id,
+            offer_link=f"https://www.otodom.pl/pl/oferta/{offer_data.get('slug', '')}",
+            title=listing_title,
+            market=market_type,
+            advert_type=advertisement_type,
+            creation_date=creation_date,
+            pushed_up_at=promoted_at,
+            exclusive_offer=is_exclusive_offer,
+            creation_source=creation_source,
+            description_text=description_text,
+            area=area,
+            price=price,
+            price_per_m=price_per_m,
+            rent_amount=rent,
+            rooms_num=rooms_num,
+            floor_num=floor_num,
+            heating=heating_type,
+            ownership=ownership,
+            proper_type=proper_type,
+            construction_status=construction_status,
+            features_utilities=features_utilities,
+            features_equipment=features_equipment,
+            features_additional_information=features_additional_information,
+            energy_certificate=energy_certificate,
+            voivodeship=voivodeship,
+            city=city,
+            district=district,
+            street=street,
+            building_build_year=building_build_year,
+            building_floors_num=building_floors_count,
+            building_material=building_material,
+            building_type=building_type,
+            windows_type=windows_type,
+            security_types=security_types,
+            local_plan_url=local_plan_url,
+            video_url=video_url,
+            view3d_url=view3d_url,
+            walkaround_url=walkaround_url,
+            development_id=development_id,
+            development_title=development_title or None,
+            owner_id=None if owner_id == 0 else owner_id,
+            owner_name=owner_name,
+            agency_id=agency_id,
+            agency_name=agency_name,
+        )
 
 
 def get_offer_status(offer_link: str) -> str:

@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from domain.models import ListingFull
 
 
 FLOOR_MAPPING = {
@@ -70,51 +71,45 @@ def clean_text(text: str) -> str:
     return text
 
 
-def transform_data(data: dict) -> dict:
-    transformed_data = data.copy()
+def transform_data(listing: ListingFull) -> ListingFull:
+    listing.rooms_num = extract_rooms_num(listing.rooms_num)
+    listing.floor_num = clear_floor_num(listing.floor_num)
+    listing.ownership = simplify_ownership(listing.ownership)
 
-    transformed_data["rooms_num"] = extract_rooms_num(transformed_data.get("rooms_num"))
-    transformed_data["floor_num"] = clear_floor_num(transformed_data.get("floor_num"))
-    transformed_data["ownership"] = simplify_ownership(transformed_data.get("ownership"))
+    listing.construction_status = extract_text(listing.construction_status)
+    listing.building_material = extract_text(listing.building_material)
+    listing.building_type = extract_text(listing.building_type)
+    listing.windows_type = extract_text(listing.windows_type)
 
-    transformed_data['construction_status'] = extract_text(transformed_data.get('construction_status'))
-    transformed_data['building_material'] = extract_text(transformed_data.get('building_material'))
-    transformed_data['building_type'] = extract_text(transformed_data.get('building_type'))
-    transformed_data['windows_type'] = extract_text(transformed_data.get('windows_type'))
-    transformed_data['security_types'] = extract_text(transformed_data.get('security_types'))
-    transformed_data['features_additional_information'] = extract_text(transformed_data.get('features_additional_information'))
-    transformed_data['features_equipment'] = extract_text(transformed_data.get('features_equipment'))
-    transformed_data['features_utilities'] = extract_text(transformed_data.get('features_utilities'))
-
-    transformed_data['features'] = ' '.join([
-        str(transformed_data.get('features_additional_information', '')).lower(),
-        str(transformed_data.get('features_equipment', '')).lower(),
-        str(transformed_data.get('features_utilities', '')).lower(),
-        str(transformed_data.get('security_types', '')).lower()
-    ])
-    transformed_data['features'] = (
-        transformed_data['features']
+    features_str = ' '.join([
+        extract_text(listing.features_additional_information) or '',
+        extract_text(listing.features_equipment) or '',
+        extract_text(listing.features_utilities) or '',
+        extract_text(listing.security_types) or '',
+    ]).lower()
+    listing.features = (
+        features_str
         .replace(',', ' ')
         .replace("'", "")
         .replace("cable-television", "cable_television")
     )
 
-    del transformed_data['security_types']
-    del transformed_data['features_additional_information']
-    del transformed_data['features_equipment']
-    del transformed_data['features_utilities']
+    # surowe pola scalone w features — już niepotrzebne
+    listing.features_additional_information = None
+    listing.features_equipment = None
+    listing.features_utilities = None
+    listing.security_types = None
 
-    transformed_data['energy_certificate'] = extract_text(transformed_data.get('energy_certificate'))
-    transformed_data['description_text'] = clean_text(transformed_data.get('description_text'))
+    listing.energy_certificate = extract_text(listing.energy_certificate)
+    listing.description_text = clean_text(listing.description_text)
 
-    if transformed_data.get('creation_date'):
-        creation_date = datetime.strptime(transformed_data['creation_date'], '%Y-%m-%dT%H:%M:%S%z')
-        transformed_data['creation_time'] = creation_date.strftime('%H:%M')
-        transformed_data['creation_date'] = creation_date.date()
+    if listing.creation_date:
+        creation_dt = datetime.strptime(listing.creation_date, '%Y-%m-%dT%H:%M:%S%z')
+        listing.creation_time = creation_dt.strftime('%H:%M')
+        listing.creation_date = creation_dt.date()
 
-    transformed_data['area'] = clear_numbers(transformed_data.get('area'), val='float')
-    transformed_data['price'] = clear_numbers(transformed_data.get('price'), val='int')
-    transformed_data['price_per_m'] = clear_numbers(transformed_data.get('price_per_m'), val='int')
-    transformed_data['detected_inactive_at'] = None
+    listing.area = clear_numbers(listing.area, val='float')
+    listing.price = clear_numbers(listing.price, val='int')
+    listing.price_per_m = clear_numbers(listing.price_per_m, val='int')
 
-    return transformed_data
+    return listing

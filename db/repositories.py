@@ -1,37 +1,31 @@
 import datetime
 import logging
 
+from domain.models import ListingBasic, ListingFull
+
 
 # ---------- location ----------
 
-def check_location_table(cur, offer_data):
+def check_location_table(cur, listing: ListingFull):
     location_query = """
         SELECT id FROM locations
         WHERE voivodeship = %s
         AND city = %s
         AND (district = %s OR (district IS NULL AND %s IS NULL))
         ;"""
-    location_values = (
-        offer_data['voivodeship'],
-        offer_data['city'],
-        offer_data['district'],
-        offer_data['district']
-    )
-    cur.execute(location_query, location_values)
+    cur.execute(location_query, (listing.voivodeship, listing.city, listing.district, listing.district))
     return cur.fetchone()
 
 
-def insert_into_locations_table(cur, offer_data):
-    location_result = check_location_table(cur, offer_data)
+def insert_into_locations_table(cur, listing: ListingFull):
+    location_result = check_location_table(cur, listing)
     if not location_result:
-        location_values = (offer_data['voivodeship'], offer_data['city'], offer_data['district'])
-        logging.debug(f"location {location_values} not in db, inserting")
-        location_query = """
+        logging.debug(f"location ({listing.voivodeship}, {listing.city}, {listing.district}) not in db, inserting")
+        cur.execute("""
             INSERT INTO locations (voivodeship, city, district)
             VALUES (%s, %s, %s)
             RETURNING id
-            ;"""
-        cur.execute(location_query, location_values)
+            ;""", (listing.voivodeship, listing.city, listing.district))
         new_id = cur.fetchone()[0]
         logging.debug(f"location inserted with id: {new_id}")
     else:
@@ -40,10 +34,10 @@ def insert_into_locations_table(cur, offer_data):
 
 # ---------- listings ----------
 
-def insert_into_apartments_sale_listings_table(cur, offer_data):
-    location_id = check_location_table(cur, offer_data)
+def insert_into_apartments_sale_listings_table(cur, listing: ListingFull) -> int:
+    location_id = check_location_table(cur, listing)
     if location_id is None:
-        raise ValueError(f"location not found in db for offer {offer_data.get('listing_id')} — make sure it was inserted first")
+        raise ValueError(f"location not found in db for offer {listing.listing_id} — make sure it was inserted first")
 
     listing_query = """
         INSERT INTO apartments_sale_listings (otodom_listing_id, title, market, advert_type,
@@ -51,35 +45,33 @@ def insert_into_apartments_sale_listings_table(cur, offer_data):
         area, price, updated_price, price_per_m, updated_price_per_m, location_id, street, rent_amount,
         rooms_num, floor_num, heating, ownership, proper_type, construction_status, energy_certificate,
         building_build_year, building_floors_num, building_material, building_type, windows_type,
-        local_plan_url, video_url, view3d_url, walkaround_url, development_id, development_title, owner_id, owner_name, agency_id,
-        agency_name, offer_link, active, detected_inactive_at)
+        local_plan_url, video_url, view3d_url, walkaround_url, development_id, development_title,
+        owner_id, owner_name, agency_id, agency_name, offer_link, active, detected_inactive_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         ;"""
 
-    listing_values = (
-        offer_data['listing_id'], offer_data['title'], offer_data['market'], offer_data['advert_type'],
-        offer_data['creation_date'], offer_data['creation_time'], offer_data['pushed_up_at'],
-        offer_data['exclusive_offer'], offer_data['creation_source'], offer_data['description_text'],
-        offer_data['area'], offer_data['price'], offer_data['price'],  # updated_price = price on first insert
-        offer_data['price_per_m'], offer_data['price_per_m'],  # updated_price_per_m = price_per_m on first insert
-        location_id[0], offer_data['street'], offer_data['rent_amount'], offer_data['rooms_num'],
-        offer_data['floor_num'], offer_data['heating'], offer_data['ownership'], offer_data['proper_type'],
-        offer_data['construction_status'], offer_data['energy_certificate'], offer_data['building_build_year'],
-        offer_data['building_floors_num'], offer_data['building_material'], offer_data['building_type'],
-        offer_data['windows_type'], offer_data['local_plan_url'], offer_data['video_url'],
-        offer_data['view3d_url'], offer_data['walkaround_url'], offer_data['development_id'],
-        offer_data['development_title'], offer_data['owner_id'], offer_data['owner_name'],
-        offer_data['agency_id'], offer_data['agency_name'], offer_data['offer_link'],
-        offer_data['active'], offer_data['detected_inactive_at']
-    )
-
-    cur.execute(listing_query, listing_values)
+    cur.execute(listing_query, (
+        listing.listing_id, listing.title, listing.market, listing.advert_type,
+        listing.creation_date, listing.creation_time, listing.pushed_up_at,
+        listing.exclusive_offer, listing.creation_source, listing.description_text,
+        listing.area, listing.price, listing.price,       # updated_price = price on first insert
+        listing.price_per_m, listing.price_per_m,         # updated_price_per_m = price_per_m on first insert
+        location_id[0], listing.street, listing.rent_amount, listing.rooms_num,
+        listing.floor_num, listing.heating, listing.ownership, listing.proper_type,
+        listing.construction_status, listing.energy_certificate, listing.building_build_year,
+        listing.building_floors_num, listing.building_material, listing.building_type,
+        listing.windows_type, listing.local_plan_url, listing.video_url,
+        listing.view3d_url, listing.walkaround_url, listing.development_id,
+        listing.development_title, listing.owner_id, listing.owner_name,
+        listing.agency_id, listing.agency_name, listing.offer_link,
+        listing.active, listing.detected_inactive_at,
+    ))
     return cur.fetchone()[0]
 
 
-def insert_into_features_table(cur, offer_data, id):
+def insert_into_features_table(cur, listing: ListingFull, id: int):
     features_query = """
         INSERT INTO features (listing_id, internet, cable_television, phone, roller_shutters,
         anti_burglary_door, entryphone, monitoring, alarm, closed_area, furniture, washing_machine,
@@ -89,7 +81,7 @@ def insert_into_features_table(cur, offer_data, id):
         %s, %s, %s, %s, %s, %s)
         ;"""
 
-    features_offer = list(offer_data['features'].split(' '))
+    features_offer = list((listing.features or '').split(' '))
     features_all_possibilities = (
         'internet', 'cable_television', 'phone', 'roller_shutters',
         'anti_burglary_door', 'entryphone', 'monitoring', 'alarm',
@@ -102,11 +94,11 @@ def insert_into_features_table(cur, offer_data, id):
     cur.execute(features_query, (id, *features_bools))
 
 
-def insert_new_listing(offer_data, conn, cur):
+def insert_new_listing(listing: ListingFull, conn, cur) -> int:
     try:
-        insert_into_locations_table(cur, offer_data)
-        created_offer_id = insert_into_apartments_sale_listings_table(cur, offer_data)
-        insert_into_features_table(cur, offer_data, created_offer_id)
+        insert_into_locations_table(cur, listing)
+        created_offer_id = insert_into_apartments_sale_listings_table(cur, listing)
+        insert_into_features_table(cur, listing, created_offer_id)
         logging.debug(f"offer saved to db with id: {created_offer_id}")
         conn.commit()
         return created_offer_id
@@ -169,7 +161,7 @@ def update_deleted_offers(offer_data, conn, cur):
 
 # ---------- checks ----------
 
-def check_if_offer_exists(offer: dict, cur) -> bool:
+def check_if_offer_exists(offer: ListingBasic, cur) -> bool:
     try:
         if_exists_query = """
             SELECT id
@@ -177,26 +169,24 @@ def check_if_offer_exists(offer: dict, cur) -> bool:
             WHERE otodom_listing_id = %s AND area = %s
             LIMIT 1
             ;"""
-        id = offer.get('listing_id')
-        area = offer.get('area')
-        cur.execute(if_exists_query, (id, area))
+        cur.execute(if_exists_query, (offer.listing_id, offer.area))
         result = cur.fetchone()
         if result is None:
-            logging.debug(f"offer {id} (area: {area}) not in db — will fetch")
+            logging.debug(f"offer {offer.listing_id} (area: {offer.area}) not in db — will fetch")
             return False
         else:
-            logging.debug(f"offer {id} (area: {area}) already in db under id: {result}")
+            logging.debug(f"offer {offer.listing_id} (area: {offer.area}) already in db under id: {result}")
             return True
     except Exception as error:
         logging.exception(f"error checking if offer exists in db: {error}")
         return None
 
 
-def check_if_price_changed(offer: dict, cur) -> tuple:
+def check_if_price_changed(offer: ListingBasic, cur) -> tuple:
     try:
-        id_otodom = offer.get('listing_id')
-        new_price = offer.get('price')
-        new_price_per_m = offer.get('price_per_m')
+        id_otodom = offer.listing_id
+        new_price = offer.price
+        new_price_per_m = offer.price_per_m
 
         cur.execute("""
             SELECT id, updated_price
@@ -219,7 +209,7 @@ def check_if_price_changed(offer: dict, cur) -> tuple:
         logging.exception(f"error checking if price changed: {error}")
 
 
-def find_potentially_deleted_offers(fetched_offers: list, city: str, cur) -> set:
+def find_potentially_deleted_offers(fetched_offers: list[ListingBasic], city: str, cur) -> set:
     all_offers_from_db_query = """
         SELECT asl.id, asl.otodom_listing_id, asl.area
         FROM apartments_sale_listings asl
@@ -230,7 +220,7 @@ def find_potentially_deleted_offers(fetched_offers: list, city: str, cur) -> set
     cur.execute(all_offers_from_db_query, (city.lower(),))
     all_offers_from_db = cur.fetchall()
 
-    ids_from_otodom = {offer_dict["listing_id"] for offer_dict in fetched_offers}
+    ids_from_otodom = {offer.listing_id for offer in fetched_offers}
 
     potentially_deleted = set()
     for id_db, id_otodom_from_db, area_from_db in all_offers_from_db:
