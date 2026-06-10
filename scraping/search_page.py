@@ -24,6 +24,7 @@ def get_total_pages(html_response) -> int:
 
     except Exception as error:
         logging.exception(f"error getting total pages: {error}")
+        return 0
 
 
 def download_data_from_search_results(base_url: str) -> list[ListingBasic]:
@@ -36,6 +37,8 @@ def download_data_from_search_results(base_url: str) -> list[ListingBasic]:
             raise Exception("failed to fetch first search page — check the URL")
 
         page_count = get_total_pages(response_first_page)
+        if not page_count:
+            raise Exception("could not determine page count — aborting search")
         logging.info(f"total pages found: {page_count}")
 
         for page in range(1, page_count + 1):
@@ -106,7 +109,7 @@ def download_data_from_search_results(base_url: str) -> list[ListingBasic]:
                             price_per_m=price_per_m,
                             link=link
                         ))
-                    n += 1
+                        n += 1
                 except Exception as error:
                     logging.exception(f"skipped offer {n} on page {page} (id: {listing_id}): {error}")
 

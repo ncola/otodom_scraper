@@ -264,6 +264,9 @@ def check_if_price_changed(offer: ListingBasic, cur) -> tuple:
             WHERE otodom_listing_id = %s
             ;""", (id_otodom,))
         result = cur.fetchone()
+        if result is None:
+            logging.warning(f"offer {id_otodom} not found in DB during price check")
+            return None, False, False
         id_db, old_price = result
 
         logging.debug(f"offer {id_otodom} — price on site: {new_price} (per m2: {new_price_per_m})")
@@ -277,6 +280,7 @@ def check_if_price_changed(offer: ListingBasic, cur) -> tuple:
             return id_db, new_price, new_price_per_m
     except Exception as error:
         logging.exception(f"error checking if price changed: {error}")
+        return None, False, False
 
 
 def find_potentially_deleted_offers(fetched_offers: list[ListingBasic], city: str, cur) -> set:

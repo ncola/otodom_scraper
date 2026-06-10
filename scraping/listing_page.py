@@ -30,8 +30,8 @@ def download_data_from_listing_page(html_response) -> dict:
         advert_raw = offer_data.get("advertType")
         advertisement_type = advert_raw.lower() if advert_raw is not None else None
         creation_date = offer_data.get("createdAt", None)
-        description = offer_data.get("description", None)
-        description_text = BeautifulSoup(description, "html.parser").get_text()
+        description = offer_data.get("description")
+        description_text = BeautifulSoup(description, "html.parser").get_text() if description is not None else None
         is_exclusive_offer = offer_data.get("exclusiveOffer", None)
         creation_source = _str(offer_data.get("creationSource"))
         promoted_at = offer_data.get("pushedUpAt", None)

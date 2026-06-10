@@ -46,6 +46,8 @@ def _find_closed_offers(fetched_offers: list, city: str, cur) -> set:
             logging.debug(f"checking offer {id_from_db}: {offer_link}")
             status = get_offer_status(offer_link)
             logging.debug(f"offer {id_from_db} status: {status}")
+            if status is None:
+                logging.warning(f"offer {id_from_db} — could not determine status, treating as deleted")
             if status is None or 'active' not in status:
                 deleted_offers.add((id_from_db, status))
 
@@ -53,6 +55,7 @@ def _find_closed_offers(fetched_offers: list, city: str, cur) -> set:
         return deleted_offers
     except Exception as error:
         logging.exception(f"error finding closed offers: {error}")
+        raise
 
 
 def sync(url: str, city: str):
@@ -97,6 +100,9 @@ def sync(url: str, city: str):
                 else:
                     logging.info(f"offer {id} already in db, checking price...")
                     id_db, new_price, new_price_per_m = repo.check_if_price_changed(offer, cur)
+                    if id_db is None:
+                        logging.warning(f"offer {id} — price check failed, skipping update")
+                        continue
                     if new_price:
                         repo.update_active_offers((id_db, new_price, new_price_per_m), conn, cur)
                         updated_count += 1
