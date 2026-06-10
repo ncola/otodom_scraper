@@ -2,7 +2,7 @@ name: Daily Otodom full scraper Katowice
 
 on:
   schedule:
-    - cron: "17 5 * * *"
+    - cron: "0 3 * * *"
   workflow_dispatch:
 
 jobs:
