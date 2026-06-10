@@ -2,7 +2,18 @@ name: Hourly Otodom latest scraper Katowice
 
 on:
   schedule:
-    - cron: "0 * * * *"  # every hour at :00 (e.g. 8:00, 9:00, 10:00...)
+    # Night (0-5 UTC): <0.5% of listings - once at 2 AM is enough
+    - cron: "0 2 * * *"
+
+    # Morning (6-8 UTC): 0.8-4.4% of listings per hour - every hour
+    - cron: "0 6,7,8 * * *"
+
+    # Peak hours (9-16 UTC): 8.2-16.7% of listings per hour - every 30 minutes
+    - cron: "0,30 9-16 * * *"
+
+    # Evening (17-23 UTC): <2.6% of listings per hour - every 2 hours
+    - cron: "0 18,20,22 * * *"
+
   workflow_dispatch:
 
 jobs:
