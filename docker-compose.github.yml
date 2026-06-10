@@ -1,7 +1,16 @@
 services:
-  scraper:
+  scraper_full:
     build: .
     env_file: .env
+    restart: "no"
+    volumes:
+      - ./logs:/app/logs
+
+  scraper_latest:
+    build: .
+    env_file: .env
+    environment:
+      SCRAPE_MODE: latest
     restart: "no"
     volumes:
       - ./logs:/app/logs
