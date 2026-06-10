@@ -105,6 +105,22 @@ GitHub → Actions → Daily Otodom Scraper → Run workflow
 ```
 Application logs are uploaded as GitHub Actions artifacts after each run.
 
+### Scraping Modes
+
+The scraper supports two modes, controlled via the `SCRAPE_MODE` environment variable:
+
+- **`full`** (default) — complete synchronization: fetches all search result pages, scrapes full listing data, and checks for deleted offers. Runs daily at 5:17 AM.
+  ```bash
+  docker compose run scraper_full
+  ```
+
+- **`latest`** — lightweight mode: fetches only the first page(s) of results (newest first) and stops early once it finds an offer already in the database. Useful for catching new listings quickly. Runs hourly.
+  ```bash
+  docker compose run scraper_latest
+  ```
+
+Set `SCRAPE_MODE=latest` in `.env` (or pass as environment variable) to use lightweight mode. Optionally set `LATEST_MAX_PAGES` to control how many pages to check before stopping (default: 1).
+
 ## 🔑 Environment Variables
 
 All configuration is done via `.env` file in the project root. See `.env.example` for the required variables.
