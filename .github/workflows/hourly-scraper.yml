@@ -26,7 +26,7 @@ jobs:
           EOF
 
       - name: Run scraper
-        run: docker compose -f docker-compose.github.yml up --build --abort-on-container-exit scraper
+        run: docker compose -f docker-compose.github.yml up --build --abort-on-container-exit scraper_latest
 
       - name: Upload logs
         if: always()
