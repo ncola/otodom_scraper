@@ -1,8 +1,8 @@
-name: Daily Otodom full scraper Katowice
+name: Hourly Otodom latest scraper Katowice
 
 on:
   schedule:
-    - cron: "17 5 * * *"
+    - cron: "0 * * * *"  # every hour at :00 (e.g. 8:00, 9:00, 10:00...)
   workflow_dispatch:
 
 jobs:
@@ -21,14 +21,16 @@ jobs:
           DB_USER=${{ secrets.DB_USER }}
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           DB_SSLMODE=${{ secrets.DB_SSLMODE }}
+          SCRAPE_MODE=latest
+          LATEST_MAX_PAGES=2
           EOF
 
       - name: Run scraper
-        run: docker compose -f docker-compose.github.yml up --build --abort-on-container-exit scraper_full
+        run: docker compose -f docker-compose.github.yml up --build --abort-on-container-exit scraper
 
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scraper-logs
+          name: scraper-latest-logs
           path: logs/

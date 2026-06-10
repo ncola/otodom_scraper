@@ -18,13 +18,26 @@ services:
       timeout: 5s
       retries: 10
 
-  scraper:
-    build: .                              
-    container_name: otodom_scraper
-    env_file: .env                        
+  scraper_full:
+    build: .
+    container_name: otodom_scraper_full
+    env_file: .env
     depends_on:
       db:
-        condition: service_healthy        
+        condition: service_healthy
+    restart: "no"
+    volumes:
+      - ./logs:/app/logs
+
+  scraper_latest:
+    build: .
+    container_name: otodom_scraper_latest
+    env_file: .env
+    environment:
+      SCRAPE_MODE: latest
+    depends_on:
+      db:
+        condition: service_healthy
     restart: "no"
     volumes:
       - ./logs:/app/logs
