@@ -15,7 +15,7 @@ from db.repositories import (
     find_offer_links,
 )
 from domain.models import ListingBasic
-from tests.conftest import make_listing
+from tests.conftest import make_listing, listing_basic
 
 
 # ---------- update_active_offers ----------
@@ -215,20 +215,20 @@ def test_find_potentially_deleted_offers_empty_when_all_present():
 
 # ---------- check_if_offer_exists ----------
 
-def test_check_if_offer_exists_returns_true_when_found(listing_basic):
+def test_check_if_offer_exists_returns_true_when_found():
     cur = MagicMock()
     cur.fetchone.return_value = (7,)  # DB returned a row ->offer exists
 
-    result = check_if_offer_exists(listing_basic, cur)
+    result = check_if_offer_exists(listing_basic(), cur)
 
     assert result is True
 
 
-def test_check_if_offer_exists_returns_false_when_not_found(listing_basic):
+def test_check_if_offer_exists_returns_false_when_not_found():
     cur = MagicMock()
     cur.fetchone.return_value = None  # no row -> offer not in DB
 
-    result = check_if_offer_exists(listing_basic, cur)
+    result = check_if_offer_exists(listing_basic(), cur)
 
     assert result is False
 

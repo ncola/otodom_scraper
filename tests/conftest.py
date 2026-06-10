@@ -81,14 +81,19 @@ def listing_raw() -> ListingFull:
     return make_listing()
 
 
-@pytest.fixture
-def listing_basic() -> ListingBasic:
-    """Basic listing as it comes from search_page.py."""
+def listing_basic(
+    listing_id=12345678,
+    area=65.5,
+    price=549000,
+    price_per_m=8381,
+    link="https://www.otodom.pl/pl/oferta/przestronne-3-pok-balkon-katowice-koszutka-ID12345678",
+) -> ListingBasic:
+    """Creates a ListingBasic with defaults; pass arguments to override."""
     return ListingBasic(
-        listing_id=12345678,
-        area=65.5,
-        price=549000,
-        price_per_m=8381,
-        link="https://www.otodom.pl/pl/oferta/przestronne-3-pok-balkon-katowice-koszutka-ID12345678",
+        listing_id=listing_id,
+        area=area,
+        price=price,
+        price_per_m=price_per_m,
+        link=link,
     )
 
