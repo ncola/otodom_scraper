@@ -1,148 +1,209 @@
-# Apartments for sale - Otodom property scraper & database manager 
+# Otodom apartments scraper
 
 ## 🏡 About
 
-This project is a web scraping tool designed to automatically collect real estate data from Otodom, a popular property listing platform. The scraper automates the process of extracting property listings and their associated data, which is then stored in a PostgreSQL database for further analysis
+Scrapes apartment listings from Otodom (Polish real estate site) into a PostgreSQL database. Tracks price changes over time, marks listings that disappear, and runs on a schedule via Docker or GitHub Actions.
 
-The project is currently tailored for scraping only real estate listings related to apartment sales in a specific city
+## 🎯 What it does
 
-⚠️ **Built only for personal use, for learning and portfolio purposes. I do not recommend using this code for anything other than learning**
+- Two scraping modes: a full daily sync and a lightweight intra-day refresh for new offers
+- Price history kept as a separate table - every price change is saved
+- Listings that disappear get flagged, not deleted
+- Normalized location schema (voivodeship -> city -> district -> street) so adding new cities later doesn't require migrations
+- Unit tests for parsing and the repository layer (mocked DB)
 
+## 🏗 Architecture
 
-## 📦 Database Structure
+A few decisions worth mentioning:
 
-The database is designed to store apartment listings data, price history, photos, and extracted features. It consists of the following tables:
+- **Two listing models** (`ListingBasic` vs `ListingFull`) — full HTML is only parsed when we actually need the details, not on every list page
+- **Normalization is its own layer** (`domain/normalize.py`) so cleaning logic isn't tangled with scraping or DB code
+- **Two scraping modes**: `full` (daily) does everything; `latest` (intra-day) only fetches new offers and stops as soon as it hits something already in the DB
+- **Price history + soft deletes**: makes time-series analysis possible without losing data on offers that get taken down
 
-- `locations` – stores unique location details (city, district, street, etc)
-- `apartments_sale_listings` – main table for apartment data
-- `price_history` – stores historical price changes
-- `photos` – stores binary image data (BYTEA type) related to listings
-- `features` – extracted flat features (e.g. air conditioning, balcony, parking, etc)
+---
 
-💡 You can preview the structure in `db/schema.sql`
+## 📦 Database structure
 
-⚠️ It is designed primarily to work with Katowice listings on Otodom. Therefore, the structure of the locations table assumes expansion to other cities, but still within the Silesian region. The scraper will work for other cities and voivodeships, but the database may not be optimally structured. For future expansion, it is recommended to split the locations table into smaller parts, such as separate tables for voivodeships, cities and/or districts.
+The schema stores listings, price history, photos and extracted features:
 
-![Database Structure](imgs/db_structure.png)
+- `locations` — unique locations (city, district, street, …)
+- `apartments_sale_listings` — main listings table
+- `price_history` — historical price changes
+- `photos` — image binaries (BYTEA)
+- `features` — extracted flat features (AC, balcony, parking, …)
 
-## 🚀 Running options
-### 1️⃣ Running with Docker (recommended)
+💡 Full schema in `db/schema.sql`.
 
-The easiest way to run the project is with Docker — no need to install PostgreSQL manually.
+⚠️ The schema is tuned for Katowice and the Silesian region. It will work for other cities, but if you want to scrape the whole country it's probably worth splitting `locations` into separate tables for voivodeships, cities and districts.
 
-**Requirements:** [Docker Desktop](https://www.docker.com/products/docker-desktop) installed and running.
+![Database structure](imgs/db_structure.png)
 
-**1. Create your `.env` file** (copy from the example and fill in your password)
+## 🚀 Quick start
 
+**Requires:** [Docker Desktop](https://www.docker.com/products/docker-desktop)
 
-**2. Build and run:**
+```bash
+# 1. Copy config and fill it in
+cp .env.example .env
+
+# 2. Run (builds PostgreSQL + scraper in one go)
+docker compose up --build
+
+# 3. Run later (database persists)
+docker compose up
+
+# 4. Stop everything
+docker compose down
+```
+
+Database data lives in a Docker volume and survives `docker compose down`. To wipe it: `docker compose down -v`.
+
+---
+
+## 📦 Deployment options
+
+### 1️⃣ Docker (easiest)
+
+PostgreSQL + scraper in containers, no manual DB setup.
 
 ```bash
 docker compose up --build
 ```
 
-This will:
-- start a PostgreSQL container (`otodom_db`)
-- build the scraper image and run it once
-- scraper exits after finishing — no background processes left running
+This starts:
+- PostgreSQL container (`otodom_db`) on port 5432
+- The scraper runs once and exits (no background daemon)
+- Data persists in the `otodom_pgdata` volume
 
-**3. To run the scraper again** (database keeps its data between runs):
+### 2️⃣ Local Python
 
-```bash
-docker compose up
-```
-
-**4. To stop and remove containers:**
+If you'd rather skip Docker:
 
 ```bash
-docker compose down
-```
-
-> 💡 Database data is stored in a Docker volume (`otodom_pgdata`) and persists between runs. To wipe the data completely: `docker compose down -v`
-
-
-### 2️⃣ Running locally (alternative)
-
-If you prefer to run without Docker, you need **PostgreSQL** installed and a database created:
-
-```bash
+# 1. Create the database
 psql -U postgres
 CREATE DATABASE apartments_for_sale_otodom;
-```
+\q
 
-Then set up your `.env` with `DB_HOST=localhost` and run:
-
-```bash
+# 2. Install and run
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python3 main.py
 ```
 
-### 3️⃣ Running with GitHub Actions and Neon
+In `.env`, set `DB_HOST=localhost`.
 
-This project can be also run automatically once per day using GitHub Actions.
+### 3️⃣ GitHub Actions (scheduled)
 
-Required repository secrets:
+Run the scraper on a schedule using GitHub Actions + an external PostgreSQL (e.g. [Neon](https://neon.tech)).
 
-- `DB_HOST`
-- `DB_PORT`
-- `DB_NAME`
-- `DB_USER`
-- `DB_PASSWORD`
-- `DB_SSLMODE`
+**Setup:**
+1. Add repository secrets: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE`
+2. Workflows are defined in `.github/workflows/` (daily full sync + intra-day latest)
+3. Logs are uploaded as artifacts after each run
 
-The database should be an external PostgreSQL instance, for example Neon.
+**Manual trigger:** GitHub -> Actions -> pick the workflow -> Run workflow
 
-The scheduled workflow is defined in:
+## 🔄 Scraping modes
 
-```text
-.github/workflows/daily-scraper.yml
+Controlled via the `SCRAPE_MODE` environment variable. Two tiers — one keeps the data fresh, the other keeps it complete:
+
+| Mode | Schedule (UTC) | Scope | Use case |
+|------|----------------|-------|----------|
+| **`full`** (default) | Daily at 03:00 | All pages, full detail scrape, detects deleted offers | Complete daily sync |
+| **`latest`** | Adaptive through the day — denser when more listings appear: every 30 min in peak (09–16), hourly in the morning (06–08), every 2h in the evening (18/20/22), plus a 02:00 run | First N pages, stops at the first offer already in DB | Fast delta for new listings |
+
+**Configuration:**
+
+```bash
+# In .env:
+SCRAPE_MODE=latest          # or "full"
+LATEST_MAX_PAGES=1          # for latest mode: how many pages to scan
+
+# Manual run:
+docker compose run scraper_full      # force full sync
+docker compose run scraper_latest    # force latest mode
 ```
-It can also be triggered manually from:
+
+## 📂 Project structure
+
 ```
-GitHub → Actions → Daily Otodom Scraper → Run workflow
+otodom_scraper/
+├── scraping/              # web scraping 
+│   ├── client.py
+│   ├── search_page.py
+│   └── listing_page.py
+│
+├── domain/                # models + normalization
+│   ├── models.py
+│   └── normalize.py
+│
+├── services/              # sync strategies
+│   ├── sync_listings.py   # full sync
+│   └── sync_latest.py     # lightweight delta
+│
+├── db/                    # data layer
+│   ├── listings_repo.py
+│   ├── schema.sql
+│   └── migration/
+│
+├── config/
+│   └── logging_config.py
+│
+├── tests/
+│   ├── test_normalize.py
+│   ├── test_search_page.py
+│   └── test_listing_page.py
+│
+├── main.py
+├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml
+└── .env.example
 ```
-Application logs are uploaded as GitHub Actions artifacts after each run.
 
-### Scraping Modes
+The layers are isolated on purpose: when Otodom changes their HTML, the breakage stays in `scraping/` and doesn't leak into the DB schema.
 
-The scraper supports two modes, controlled via the `SCRAPE_MODE` environment variable:
+---
 
-- **`full`** (default) — complete synchronization: fetches all search result pages, scrapes full listing data, and checks for deleted offers. Runs daily at 5:17 AM.
-  ```bash
-  docker compose run scraper_full
-  ```
+## 🔑 Environment variables
 
-- **`latest`** — lightweight mode: fetches only the first page(s) of results (newest first) and stops early once it finds an offer already in the database. Useful for catching new listings quickly. Runs hourly.
-  ```bash
-  docker compose run scraper_latest
-  ```
+Everything is configured via `.env`. See `.env.example` for the list.
 
-Set `SCRAPE_MODE=latest` in `.env` (or pass as environment variable) to use lightweight mode. Optionally set `LATEST_MAX_PAGES` to control how many pages to check before stopping (default: 1).
+> 💡 On first run, the required tables are created automatically if they don't exist.
 
-## 🔑 Environment Variables
+## 🧪 Testing
 
-All configuration is done via `.env` file in the project root. See `.env.example` for the required variables.
-
-> 💡 When running for the first time, the necessary tables will be automatically created if they don't already exist.
-
-
-## 🧪 Tests
-
-The project has a unit test suite covering the repository and normalization layers. Tests use `pytest` and mock the database connection — no real DB needed to run them.
+Tests run on `pytest` with a mocked database — no PostgreSQL needed.
 
 ```bash
 source venv/bin/activate
 pytest tests/
 ```
 
-> 🚧 Planned: remaining unit and integration tests for the scraping and service layers.
->
-> 🚧 Planned: contract tests for the scraping layer — to detect if Otodom changes their page structure (missing fields, changed JSON keys, etc.), the kind of breakage that currently only surfaces at runtime.
+**Covered:**
+- ✅ Parsing (search pages, listing detail pages)
+- ✅ Normalization
+- ✅ Repository layer (CRUD)
+
+**Not covered yet:**
+- 🚧 Integration tests with a real DB
+- 🚧 Contract tests that catch Otodom HTML changes in CI (right now I only find out when the scraper starts producing nulls)
+- 🚧 Service layer (sync orchestration)
 
 ## 📝 Logging
 
-Database operations are logged using Python's logging module. Logs are saved to the logs/ directory and can be adjusted via `config/logging_config.py`. If you are using option 3 with GitHub Actions the logs are stored as GitHub Actions artifacts after each run.
+Database operations are logged via Python's `logging` module. Logs go to `logs/`, configured in `config/logging_config.py`. On GitHub Actions, logs are uploaded as artifacts after each run.
 
+---
 
+## 📌 Good to know
+
+- Otodom doesn't have a public API, but the data sits as JSON embedded in the HTML — no need for a real browser
+- Nothing ever gets deleted from the DB - offers that disappear get a `detected_inactive_at` timestamp, so the history stays intact
+- Re-runs are safe to interrupt - duplicates are blocked by `created_at` and price changes land in `price_history`
+- The two scraping modes exist because hammering Otodom hourly with a full scrape is a waste of bandwidth and a fast way to get rate-limited
+- The schema was built around Katowice but the `voivodeship -> city -> district -> street` hierarchy means adding new cities doesn't need a migration
+- GitHub Actions logs are uploaded as artifacts, so you can actually debug a failed run instead of guessing
