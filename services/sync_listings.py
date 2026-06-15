@@ -76,6 +76,10 @@ def sync(url: str, city: str):
         all_offers_basic = download_data_from_search_results(url)
         logging.debug(f"all offers from search page: {all_offers_basic}")
 
+        if not all_offers_basic:
+            logging.error("no offers fetched from search results — aborting sync")
+            return
+
         conn, cur = get_fresh_connection()
         try:
             new_count = 0

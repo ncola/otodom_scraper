@@ -137,3 +137,4 @@ def download_data_from_search_results(base_url: str) -> list[ListingBasic]:
 
     except Exception as error:
         logging.exception(f"error downloading data from search results: {error}")
+        return []
