@@ -24,20 +24,27 @@ CITIES = {
     },
 }
 
-_BASE = "https://www.otodom.pl/pl/wyniki/sprzedaz/mieszkanie"
 _QUERY = "?viewType=listing&by=LATEST&direction=DESC&limit=72"
 
 
-def build_search_url(city_key: str) -> str:
+def build_search_url(city_key: str, property_type: str = "apartment") -> str:
+    """Build a sale-results URL for apartments or plots."""
     if city_key not in CITIES:
         supported = ", ".join(sorted(CITIES.keys()))
         raise ValueError(
             f"unknown city '{city_key}' — supported: {supported}. "
             f"Add it to config/cities.py to enable."
         )
+    property_paths = {"apartment": "mieszkanie", "plot": "dzialka"}
+    if property_type not in property_paths:
+        raise ValueError("unknown property_type '%s' — supported: %s" % (
+            property_type, ", ".join(sorted(property_paths))
+        ))
+
     c = CITIES[city_key]
     return (
-        f"{_BASE}/{c['voivodeship']}/{c['powiat']}/"
+        f"https://www.otodom.pl/pl/wyniki/sprzedaz/{property_paths[property_type]}/"
+        f"{c['voivodeship']}/{c['powiat']}/"
         f"{c['gmina']}/{c['city_slug']}{_QUERY}"
     )
 

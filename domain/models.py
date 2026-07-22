@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import date
+from typing import Any
 
 
 @dataclass
@@ -70,3 +71,55 @@ class ListingFull:
     owner_name: str | None = None
     agency_id: int | None = None
     agency_name: str | None = None
+
+
+@dataclass
+class PlotListingFull:
+    """A plot offer, keeping Otodom's variable plot attributes losslessly."""
+    listing_id: int
+    offer_link: str
+    active: bool = True
+    detected_inactive_at: date | None = None
+
+    title: str | None = None
+    description_text: str | None = None
+    market: str | None = None
+    advert_type: str | None = None
+    advertiser_type: str | None = None
+    creation_source: str | None = None
+    creation_at: str | None = None
+    modified_at: str | None = None
+    pushed_up_at: str | None = None
+    exclusive_offer: bool | None = None
+    source_status: str | None = None
+
+    area: float | None = None
+    price: float | None = None
+    price_per_m: float | None = None
+
+    voivodeship: str | None = None
+    city: str | None = None
+    district: str | None = None
+    street: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+
+    plot_types: list[str] | None = None
+    dimensions: str | None = None
+    fence: str | None = None
+    media_types: list[str] | None = None
+    access_types: list[str] | None = None
+    vicinity_types: list[str] | None = None
+
+    owner_id: int | None = None
+    owner_name: str | None = None
+    agency_id: int | None = None
+    agency_name: str | None = None
+    local_plan_url: str | None = None
+    video_url: str | None = None
+    view3d_url: str | None = None
+    walkaround_url: str | None = None
+
+    source_target: dict[str, Any] = field(default_factory=dict)
+    source_attributes: dict[str, Any] = field(default_factory=dict)
+    source_characteristics: list[dict[str, Any]] = field(default_factory=list)

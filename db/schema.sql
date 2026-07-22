@@ -5,6 +5,8 @@ CREATE TABLE locations (
     district TEXT  -- Dzielnica
 );
 
+-- APARTMENTS
+
 CREATE TABLE apartments_sale_listings (
     id SERIAL PRIMARY KEY,
     otodom_listing_id BIGINT, -- ID oferty (z otodom)
@@ -118,3 +120,76 @@ ON features (listing_id);
 
 CREATE INDEX IF NOT EXISTS ix_photos_listing
 ON photos (listing_id);
+
+
+-- PLOTS
+
+CREATE TABLE IF NOT EXISTS plots_sale_listings (
+    id BIGSERIAL PRIMARY KEY,
+    otodom_listing_id BIGINT NOT NULL UNIQUE,
+    offer_link TEXT NOT NULL,
+    source_status TEXT,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    detected_inactive_at TIMESTAMPTZ,
+    title TEXT,
+    description_text TEXT,
+    market TEXT,
+    advert_type TEXT,
+    advertiser_type TEXT,
+    creation_source TEXT,
+    creation_at TIMESTAMPTZ,
+    modified_at TIMESTAMPTZ,
+    pushed_up_at TIMESTAMPTZ,
+    exclusive_offer BOOLEAN,
+    area NUMERIC(14, 2),
+    price NUMERIC(16, 2),
+    updated_price NUMERIC(16, 2),
+    price_per_m NUMERIC(14, 2),
+    updated_price_per_m NUMERIC(14, 2),
+    location_id INTEGER REFERENCES locations(id),
+    street TEXT,
+    latitude NUMERIC(9, 6),
+    longitude NUMERIC(9, 6),
+    plot_types TEXT[],
+    dimensions TEXT,
+    fence TEXT,
+    media_types TEXT[],
+    access_types TEXT[],
+    vicinity_types TEXT[],
+    owner_id BIGINT,
+    owner_name TEXT,
+    agency_id BIGINT,
+    agency_name TEXT,
+    local_plan_url TEXT,
+    video_url TEXT,
+    view3d_url TEXT,
+    walkaround_url TEXT,
+    source_target JSONB NOT NULL DEFAULT '{}'::jsonb,
+    source_attributes JSONB NOT NULL DEFAULT '{}'::jsonb,
+    source_characteristics JSONB NOT NULL DEFAULT '[]'::jsonb,
+    db_created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    db_updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS plots_price_history (
+    id BIGSERIAL PRIMARY KEY,
+    listing_id BIGINT NOT NULL REFERENCES plots_sale_listings(id),
+    old_price NUMERIC(16, 2),
+    new_price NUMERIC(16, 2),
+    change_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_plots_location_active
+ON plots_sale_listings (location_id, active);
+
+CREATE INDEX IF NOT EXISTS ix_plots_active
+ON plots_sale_listings (active);
+
+CREATE INDEX IF NOT EXISTS ix_plots_price_history_listing
+ON plots_price_history (listing_id);
+
+CREATE INDEX IF NOT EXISTS ix_plots_media_types
+ON plots_sale_listings USING GIN (media_types);
+
+CREATE INDEX IF NOT EXISTS ix_plots_source_target
+ON plots_sale_listings USING GIN (source_target);

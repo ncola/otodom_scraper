@@ -3,15 +3,18 @@ import logging
 from domain.models import ListingBasic
 from scraping.client import fetch_page, is_allowed_to_scrape
 from scraping.search_page import parse_offers_from_response
-from services.sync_listings import _scrape_offer
+from services.sync_listings import _scrape_offer, _strategy
 from db.connection import get_fresh_connection
+from db.schema import create_tables, run_migrations
 from db import repositories as repo
+from db import repositories_plots as plots_repo
 from config.logging_config import setup_failed_offers_logger
 
 failed_logger = setup_failed_offers_logger()
 
 
-def _process_offers(offers: list[ListingBasic], conn, cur) -> tuple[int, int, bool]:
+def _process_offers(offers: list[ListingBasic], conn, cur, repository=repo,
+                    parser=None, normalizer=None) -> tuple[int, int, bool]:
     """Processes a list of offers from a single page.
 
     For each offer: saves it if new, checks price if already known.
@@ -27,10 +30,10 @@ def _process_offers(offers: list[ListingBasic], conn, cur) -> tuple[int, int, bo
         if len(str(offer.listing_id)) != 8:
             continue
 
-        if not repo.check_if_offer_exists(offer, cur):
-            offer_data = _scrape_offer(offer)
+        if not repository.check_if_offer_exists(offer, cur):
+            offer_data = _scrape_offer(offer, parser, normalizer) if parser else _scrape_offer(offer)
             if offer_data:
-                id_db = repo.insert_new_listing(offer_data, conn, cur)
+                id_db = repository.insert_new_listing(offer_data, conn, cur)
                 new_count += 1
                 logging.info(f"offer {offer.listing_id} saved to db under id {id_db}")
             else:
@@ -38,9 +41,9 @@ def _process_offers(offers: list[ListingBasic], conn, cur) -> tuple[int, int, bo
                 failed_logger.error(f"{offer.listing_id} | {offer.link} | failed to fetch full offer data")
         else:
             logging.info(f"offer {offer.listing_id} already in db — assuming older offers also known, stopping early")
-            id_db, new_price, new_price_per_m = repo.check_if_price_changed(offer, cur)
+            id_db, new_price, new_price_per_m = repository.check_if_price_changed(offer, cur)
             if id_db and new_price:
-                repo.update_active_offers((id_db, new_price, new_price_per_m), conn, cur)
+                repository.update_active_offers((id_db, new_price, new_price_per_m), conn, cur)
                 updated_count += 1
                 logging.info(f"offer {offer.listing_id} price updated")
             return new_count, updated_count, True
@@ -48,7 +51,7 @@ def _process_offers(offers: list[ListingBasic], conn, cur) -> tuple[int, int, bo
     return new_count, updated_count, False
 
 
-def sync_latest(url: str, city: str, max_pages: int = 1):
+def sync_latest(url: str, city: str, max_pages: int = 1, property_type: str = "apartment"):
     """Lightweight scraper for catching the newest listings.
 
     Fetches only the first `max_pages` pages (sorted by latest) and stops
@@ -56,6 +59,7 @@ def sync_latest(url: str, city: str, max_pages: int = 1):
     further back is already known. Skips the deletion check entirely.
     """
     try:
+        repository, parser, normalizer, _ = _strategy(property_type)
         result = is_allowed_to_scrape(url)
         logging.info(f"scraping allowed: {result}")
 
@@ -64,6 +68,11 @@ def sync_latest(url: str, city: str, max_pages: int = 1):
 
         conn, cur = get_fresh_connection()
         try:
+            create_tables(cur)
+            run_migrations(cur)
+            if property_type == "plot":
+                plots_repo.ensure_tables_exist(cur)
+            conn.commit()
             for page in range(1, max_pages + 1):
                 page_url = f"{url}&page={page}"
                 logging.info(f"sync_latest: fetching page {page}/{max_pages}")
@@ -73,7 +82,9 @@ def sync_latest(url: str, city: str, max_pages: int = 1):
                     continue
 
                 offers = parse_offers_from_response(html_response, page=page)
-                new_count, updated_count, stop_early = _process_offers(offers, conn, cur)
+                new_count, updated_count, stop_early = _process_offers(
+                    offers, conn, cur, repository, parser, normalizer
+                )
                 total_new += new_count
                 total_updated += updated_count
 

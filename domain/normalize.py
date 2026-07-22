@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from domain.models import ListingFull
+from domain.models import ListingFull, PlotListingFull
 
 
 FLOOR_MAPPING = {
@@ -114,4 +114,24 @@ def transform_data(listing: ListingFull) -> ListingFull:
     listing.price = clear_numbers(listing.price, val='int')
     listing.price_per_m = clear_numbers(listing.price_per_m, val='int')
 
+    return listing
+
+
+def transform_plot_data(listing: PlotListingFull) -> PlotListingFull:
+    """Normalize only stable scalar values; preserve raw Otodom fields unchanged."""
+    listing.title = clean_text(listing.title)
+    listing.description_text = clean_text(listing.description_text)
+    # Keep the categoricals consistent with apartment listings.  Otodom sends
+    # these values in upper case on detail pages (e.g. ``AGENCY``), while the
+    # apartment pipeline stores their lower-case counterpart.
+    listing.market = listing.market.lower() if listing.market else None
+    listing.advert_type = listing.advert_type.lower() if listing.advert_type else None
+    listing.advertiser_type = listing.advertiser_type.lower() if listing.advertiser_type else None
+    listing.creation_source = listing.creation_source.lower() if listing.creation_source else None
+    listing.source_status = listing.source_status.lower() if listing.source_status else None
+    listing.area = clear_numbers(listing.area, val='float')
+    listing.price = clear_numbers(listing.price, val='float')
+    listing.price_per_m = clear_numbers(listing.price_per_m, val='float')
+    listing.latitude = clear_numbers(listing.latitude, val='float')
+    listing.longitude = clear_numbers(listing.longitude, val='float')
     return listing
