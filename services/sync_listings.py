@@ -36,10 +36,16 @@ def _scrape_offer(offer: ListingBasic) -> ListingFull | None:
                 return None
 
 
-def _find_closed_offers(fetched_offers: list, city: str, cur) -> set:
+def _find_closed_offers(fetched_offers: list, city: str) -> set:
     try:
-        potentially_deleted = repo.find_potentially_deleted_offers(fetched_offers, city, cur)
-        potentially_deleted_links = repo.find_offer_links(potentially_deleted, cur)
+        # short-lived connection only for the two SELECTs; released before the long HTTP loop
+        conn, cur = get_fresh_connection()
+        try:
+            potentially_deleted = repo.find_potentially_deleted_offers(fetched_offers, city, cur)
+            potentially_deleted_links = repo.find_offer_links(potentially_deleted, cur)
+        finally:
+            cur.close()
+            conn.close()
 
         deleted_offers = set()
         for id_from_db, offer_link in potentially_deleted_links:
@@ -117,15 +123,24 @@ def sync(url: str, city: str):
             logging.info(f"price updates: {updated_count}")
             logging.info("-----------------------------------------")
 
-            logging.info("checking for deleted offers...")
-            deleted_offers = _find_closed_offers(all_offers_basic, city, cur)
-            logging.info("updating deleted offers in db...")
-            for deleted_offer in deleted_offers:
-                repo.update_deleted_offers(deleted_offer, conn, cur)
-
         finally:
             cur.close()
             conn.close()
+
+        # HTTP-only phase — no DB connection held during the ~minutes-long status check loop
+        logging.info("checking for deleted offers...")
+        deleted_offers = _find_closed_offers(all_offers_basic, city)
+
+        if deleted_offers:
+            # fresh connection just for the UPDATEs; the previous one would have been idle-killed by the DB
+            logging.info("updating deleted offers in db...")
+            conn, cur = get_fresh_connection()
+            try:
+                for deleted_offer in deleted_offers:
+                    repo.update_deleted_offers(deleted_offer, conn, cur)
+            finally:
+                cur.close()
+                conn.close()
 
         logging.info("done")
 

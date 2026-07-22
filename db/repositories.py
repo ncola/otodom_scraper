@@ -225,7 +225,11 @@ def update_deleted_offers(offer_data, conn, cur):
         logging.debug(f"offer {id_db} marked as inactive on {current_date}")
         conn.commit()
     except Exception as error:
-        conn.rollback()
+        # rollback may itself fail if the connection is already dead; don't let it kill the outer loop
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         logging.exception(f"error updating deleted offers: {error}")
 
 
