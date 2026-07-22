@@ -10,6 +10,8 @@ Scrapes apartment listings from Otodom (Polish real estate site) into a PostgreS
 - Price history kept as a separate table - every price change is saved
 - Listings that disappear get flagged, not deleted
 - Normalized location schema (voivodeship -> city -> district -> street) so adding new cities later doesn't require migrations
+- Config-driven cities: one entry in `config/cities.py` is enough — the search URL is built and validated on startup
+- Multiple cities run in parallel via a GitHub Actions matrix; ad-hoc runs for a single city via workflow dispatch
 - Unit tests for parsing and the repository layer (mocked DB)
 
 ## 🏗 Architecture
@@ -106,6 +108,17 @@ Run the scraper on a schedule using GitHub Actions + an external PostgreSQL (e.g
 
 **Manual trigger:** GitHub -> Actions -> pick the workflow -> Run workflow
 
+**Ad-hoc single city:** GitHub -> Actions -> pick the workflow -> Run workflow -> fill in the `city` input (e.g. `bielsko-biala`). Leave it empty to run the scheduled matrix.
+
+## 🏙 Adding a new city
+
+Cities are defined in `config/cities.py`. To add one:
+
+1. Open otodom.pl, filter to the desired city, copy the URL:
+   `https://www.otodom.pl/pl/wyniki/sprzedaz/mieszkanie/{voivodeship}/{powiat}/{gmina}/{city_slug}`
+2. Add an entry to `CITIES` in `config/cities.py` with those four slugs plus `display_name` (used to validate the URL really resolves to your city on startup).
+3. To run it regularly, add the key to the `matrix.city` list in `.github/workflows/daily-scraper.yml` (and `hourly-scraper.yml`). To run it just once, use the ad-hoc workflow dispatch instead — no code changes needed.
+
 ## 🔄 Scraping modes
 
 Controlled via the `SCRAPE_MODE` environment variable. Two tiers — one keeps the data fresh, the other keeps it complete:
@@ -150,6 +163,7 @@ otodom_scraper/
 │   └── migration/
 │
 ├── config/
+│   ├── cities.py         # supported cities 
 │   └── logging_config.py
 │
 ├── tests/
@@ -170,7 +184,16 @@ The layers are isolated on purpose: when Otodom changes their HTML, the breakage
 
 ## 🔑 Environment variables
 
-Everything is configured via `.env`. See `.env.example` for the list.
+Everything is configured via `.env`. See `.env.example` for the full list.
+
+Scraper-specific variables:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `CITY` | `katowice` | Key from `config/cities.py`. The search URL is built and validated against it on startup. |
+| `SEARCH_URL` | *(unset)* | Optional escape hatch — a full URL that bypasses the builder and skips validation. Use for custom filters or specific districts. |
+| `SCRAPE_MODE` | `full` | `full` = daily sync (all pages + deletion check), `latest` = intra-day delta. |
+| `LATEST_MAX_PAGES` | `1` | For `latest` mode: how many pages to scan before giving up. |
 
 > 💡 On first run, the required tables are created automatically if they don't exist.
 

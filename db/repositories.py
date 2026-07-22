@@ -201,7 +201,7 @@ def update_active_offers(offer_data, conn, cur):
             INSERT INTO price_history (listing_id, old_price, new_price, change_date)
             VALUES (%(listing_id)s, %(old_price)s, %(new_price)s, %(change_date)s)
             """, {"listing_id": id, "old_price": old_price, "new_price": new_price, "change_date": change_date})
-        logging.debug(f"offer {id} price history saved: {old_price} → {new_price}")
+        logging.debug(f"offer {id} price history saved: {old_price} -> {new_price}")
 
         conn.commit()
     except Exception as error:
@@ -280,7 +280,7 @@ def check_if_price_changed(offer: ListingBasic, cur) -> tuple:
             logging.info(f"offer {id_otodom} — price unchanged: {old_price}")
             return id_db, False, False
         else:
-            logging.debug(f"offer {id_otodom} — price changed: {old_price} → {new_price}")
+            logging.debug(f"offer {id_otodom} - price changed: {old_price} -> {new_price}")
             return id_db, new_price, new_price_per_m
     except Exception as error:
         logging.exception(f"error checking if price changed: {error}")

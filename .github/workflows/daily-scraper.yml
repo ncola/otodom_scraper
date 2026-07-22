@@ -1,13 +1,23 @@
-name: Daily Otodom full scraper Katowice
+name: Daily Otodom full scraper
 
 on:
   schedule:
     - cron: "0 3 * * *"
   workflow_dispatch:
+    inputs:
+      city:
+        description: "Ad-hoc single city (leave empty to run the scheduled matrix)"
+        required: false
+        default: ""
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    # dispatch with a city -> run just that one; scheduled or dispatch without input -> run the default matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        city: ${{ fromJSON(inputs.city && format('["{0}"]', inputs.city) || '["katowice"]') }}
 
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +31,7 @@ jobs:
           DB_USER=${{ secrets.DB_USER }}
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           DB_SSLMODE=${{ secrets.DB_SSLMODE }}
+          CITY=${{ matrix.city }}
           EOF
 
       - name: Run scraper
@@ -30,5 +41,5 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scraper-logs
+          name: scraper-logs-${{ matrix.city }}
           path: logs/

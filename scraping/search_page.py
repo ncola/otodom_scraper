@@ -6,6 +6,35 @@ from scraping.client import fetch_page
 from domain.models import ListingBasic
 
 
+def validate_search_url(url: str, expected_display_name: str) -> None:
+    """Fetch the search URL once and verify Otodom returns real results for the
+    expected city. Raises RuntimeError with an actionable message when the URL
+    fails to load, returns no results, or resolves to a different location
+    (e.g. Otodom redirected because the slugs don't match)."""
+    response = fetch_page(url)
+    if response is None:
+        raise RuntimeError(f"search URL failed to load: {url}")
+
+    if get_total_pages(response) == 0:
+        raise RuntimeError(
+            f"search URL loaded but returned zero result pages — "
+            f"slugs may be wrong for '{expected_display_name}'. URL: {url}"
+        )
+
+    # display name should appear somewhere in the Next.js payload for a matching city;
+    # its absence usually means Otodom redirected the request to a different location
+    soup = BeautifulSoup(response.text, "html.parser")
+    script_tag = soup.find("script", {"id": "__NEXT_DATA__"})
+    payload = script_tag.string if script_tag else ""
+    if expected_display_name.lower() not in payload.lower():
+        raise RuntimeError(
+            f"search URL loaded but its payload does not mention '{expected_display_name}' — "
+            f"URL likely resolves to a different location. URL: {url}"
+        )
+
+    logging.info(f"search URL validated for '{expected_display_name}'")
+
+
 def get_total_pages(html_response) -> int:
     try:
         if html_response is None:
