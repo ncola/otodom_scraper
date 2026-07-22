@@ -119,7 +119,3 @@ class PlotListingFull:
     video_url: str | None = None
     view3d_url: str | None = None
     walkaround_url: str | None = None
-
-    source_target: dict[str, Any] = field(default_factory=dict)
-    source_attributes: dict[str, Any] = field(default_factory=dict)
-    source_characteristics: list[dict[str, Any]] = field(default_factory=list)

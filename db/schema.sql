@@ -164,9 +164,6 @@ CREATE TABLE IF NOT EXISTS plots_sale_listings (
     video_url TEXT,
     view3d_url TEXT,
     walkaround_url TEXT,
-    source_target JSONB NOT NULL DEFAULT '{}'::jsonb,
-    source_attributes JSONB NOT NULL DEFAULT '{}'::jsonb,
-    source_characteristics JSONB NOT NULL DEFAULT '[]'::jsonb,
     db_created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     db_updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -190,6 +187,3 @@ ON plots_price_history (listing_id);
 
 CREATE INDEX IF NOT EXISTS ix_plots_media_types
 ON plots_sale_listings USING GIN (media_types);
-
-CREATE INDEX IF NOT EXISTS ix_plots_source_target
-ON plots_sale_listings USING GIN (source_target);

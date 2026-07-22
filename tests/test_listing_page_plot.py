@@ -42,8 +42,6 @@ def test_plot_parser_preserves_variable_target_fields_and_precise_price_per_m():
     assert listing.plot_types == ["building"]
     assert listing.media_types == ["electricity", "water"]
     assert listing.price_per_m == 456.14
-    assert listing.source_target["Dimensions"] == "16x32"
-    assert listing.source_characteristics == [{"key": "m", "value": "570"}]
     assert listing.latitude == 50.18229
     assert listing.description_text == "Opis działki"
     assert listing.market == "all"

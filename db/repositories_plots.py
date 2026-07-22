@@ -43,10 +43,7 @@ def _params(listing: PlotListingFull, location_id: int) -> dict:
         "owner_name": listing.owner_name, "agency_id": listing.agency_id,
         "agency_name": listing.agency_name, "local_plan_url": listing.local_plan_url,
         "video_url": listing.video_url, "view3d_url": listing.view3d_url,
-        "walkaround_url": listing.walkaround_url,
-        "source_target": json.dumps(listing.source_target),
-        "source_attributes": json.dumps(listing.source_attributes),
-        "source_characteristics": json.dumps(listing.source_characteristics),
+        "walkaround_url": listing.walkaround_url
     }
 
 
@@ -65,8 +62,7 @@ def insert_new_listing(listing: PlotListingFull, conn, cur) -> int:
                 area, price, updated_price, price_per_m, updated_price_per_m,
                 location_id, street, latitude, longitude, plot_types, dimensions, fence,
                 media_types, access_types, vicinity_types, owner_id, owner_name, agency_id,
-                agency_name, local_plan_url, video_url, view3d_url, walkaround_url,
-                source_target, source_attributes, source_characteristics
+                agency_name, local_plan_url, video_url, view3d_url, walkaround_url
             ) VALUES (
                 %(otodom_listing_id)s, %(offer_link)s, %(source_status)s, %(active)s, %(detected_inactive_at)s,
                 %(title)s, %(description_text)s, %(market)s, %(advert_type)s, %(advertiser_type)s, %(creation_source)s,
@@ -74,8 +70,7 @@ def insert_new_listing(listing: PlotListingFull, conn, cur) -> int:
                 %(area)s, %(price)s, %(updated_price)s, %(price_per_m)s, %(updated_price_per_m)s,
                 %(location_id)s, %(street)s, %(latitude)s, %(longitude)s, %(plot_types)s, %(dimensions)s, %(fence)s,
                 %(media_types)s, %(access_types)s, %(vicinity_types)s, %(owner_id)s, %(owner_name)s, %(agency_id)s,
-                %(agency_name)s, %(local_plan_url)s, %(video_url)s, %(view3d_url)s, %(walkaround_url)s,
-                %(source_target)s::jsonb, %(source_attributes)s::jsonb, %(source_characteristics)s::jsonb
+                %(agency_name)s, %(local_plan_url)s, %(video_url)s, %(view3d_url)s, %(walkaround_url)s
             ) RETURNING id
         """
         cur.execute(query, _params(listing, location[0]))

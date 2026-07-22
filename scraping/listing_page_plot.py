@@ -90,9 +90,6 @@ def download_data_from_plot_listing_page(html_response) -> PlotListingFull:
         video_url=links.get("videoUrl"),
         view3d_url=links.get("view3dUrl"),
         walkaround_url=links.get("walkaroundUrl"),
-        source_target=target,
-        source_attributes=attributes,
-        source_characteristics=ad.get("characteristics") or [],
     )
 
 
