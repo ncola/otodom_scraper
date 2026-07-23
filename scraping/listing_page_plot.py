@@ -1,6 +1,8 @@
 """Parser for a single Otodom plot-sale offer page."""
 
 import json
+import logging
+
 from bs4 import BeautifulSoup
 
 from domain.models import PlotListingFull
@@ -95,11 +97,15 @@ def download_data_from_plot_listing_page(html_response) -> PlotListingFull:
 
 def get_plot_offer_status(offer_link: str) -> str | None:
     from scraping.client import fetch_page
-    response = fetch_page(offer_link)
-    if response is None:
+    try:
+        response = fetch_page(offer_link)
+        if response is None:
+            return "removed"
+        soup = BeautifulSoup(response.text, "html.parser")
+        script = soup.find("script", {"id": "__NEXT_DATA__"})
+        if script is None or not script.string:
+            return None
+        return json.loads(script.string).get("props", {}).get("pageProps", {}).get("ad", {}).get("status")
+    except Exception as error:
+        logging.exception(f"error during getting plot offer status: {error}")
         return "removed"
-    soup = BeautifulSoup(response.text, "html.parser")
-    script = soup.find("script", {"id": "__NEXT_DATA__"})
-    if script is None or not script.string:
-        return None
-    return json.loads(script.string).get("props", {}).get("pageProps", {}).get("ad", {}).get("status")
