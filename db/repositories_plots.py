@@ -118,12 +118,25 @@ def update_active_offers(offer_data, conn, cur):
         logging.exception("error updating plot price")
 
 
-def find_potentially_deleted_offers(fetched_offers: list[ListingBasic], city: str, cur) -> set:
+def get_scope_cities(fetched_offers: list[ListingBasic], cur) -> set[str]:
+    """See db/repositories.py::get_scope_cities — same idea, plots table."""
+    ids = [o.listing_id for o in fetched_offers]
+    if not ids:
+        return set()
+    cur.execute("""
+        SELECT DISTINCT l.city
+        FROM plots_sale_listings p JOIN locations l ON p.location_id = l.id
+        WHERE p.otodom_listing_id = ANY(%s)
+    """, (ids,))
+    return {row[0] for row in cur.fetchall() if row[0]}
+
+
+def find_potentially_deleted_offers(fetched_offers: list[ListingBasic], cities: set[str], cur) -> set:
     cur.execute("""
         SELECT p.id, p.otodom_listing_id
         FROM plots_sale_listings p JOIN locations l ON p.location_id = l.id
-        WHERE p.active IS TRUE AND l.city = %s
-    """, (city.lower(),))
+        WHERE p.active IS TRUE AND l.city = ANY(%s)
+    """, ([c.lower() for c in cities],))
     fetched_ids = {offer.listing_id for offer in fetched_offers}
     return {row[0] for row in cur.fetchall() if row[1] not in fetched_ids}
 

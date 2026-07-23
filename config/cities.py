@@ -22,13 +22,28 @@ CITIES = {
         "city_slug": "katowice",
         "display_name": "Katowice",
     },
+    "bielsko-biala": {
+        "voivodeship": "slaskie",
+        "powiat": "bielsko--biala",
+        "gmina": "bielsko--biala",
+        "city_slug": "bielsko--biala",
+        "display_name": "Bielsko-Biała",
+    },
 }
 
 _QUERY = "?viewType=listing&by=LATEST&direction=DESC&limit=72"
 
 
-def build_search_url(city_key: str, property_type: str = "apartment") -> str:
-    """Build a sale-results URL for apartments or plots."""
+def build_search_url(
+    city_key: str,
+    property_type: str = "apartment",
+    distance_radius: int | None = None,
+) -> str:
+    """Build a sale-results URL for apartments or plots.
+
+    distance_radius (km) widens the search around the city — Otodom supports
+    0, 5, 10, 15, 25, 50, 75. Use it when a single city has too few listings
+    on its own (typical for plots)."""
     if city_key not in CITIES:
         supported = ", ".join(sorted(CITIES.keys()))
         raise ValueError(
@@ -42,10 +57,13 @@ def build_search_url(city_key: str, property_type: str = "apartment") -> str:
         ))
 
     c = CITIES[city_key]
+    query = _QUERY
+    if distance_radius is not None:
+        query = f"{query}&distanceRadius={distance_radius}"
     return (
         f"https://www.otodom.pl/pl/wyniki/sprzedaz/{property_paths[property_type]}/"
         f"{c['voivodeship']}/{c['powiat']}/"
-        f"{c['gmina']}/{c['city_slug']}{_QUERY}"
+        f"{c['gmina']}/{c['city_slug']}{query}"
     )
 
 

@@ -19,7 +19,11 @@ if __name__ == "__main__":
     # (e.g. a district) without touching cities.py. Skips URL validation.
     url = os.environ.get("SEARCH_URL")
     if url is None:
-        url = build_search_url(city, property_type)
+        # optional widen-around-city radius (km) — used e.g. for plots where a
+        # single city has few listings; skipped when unset
+        radius_env = os.environ.get("DISTANCE_RADIUS")
+        distance_radius = int(radius_env) if radius_env else None
+        url = build_search_url(city, property_type, distance_radius=distance_radius)
         validate_search_url(url, get_display_name(city))
 
     # "latest" — lightweight, runs more often, only checks the first page(s) for new offers

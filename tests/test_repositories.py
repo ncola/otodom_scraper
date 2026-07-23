@@ -196,7 +196,7 @@ def test_find_potentially_deleted_offers_detects_missing_offer():
     ]
     fetched = [ListingBasic(listing_id=11111111, area=55.0, price=400000, price_per_m=7000, link="https://www.otodom.pl/pl/oferta/example-ID11111111")]
 
-    result = find_potentially_deleted_offers(fetched, "katowice", cur)
+    result = find_potentially_deleted_offers(fetched, {"katowice"}, cur)
 
     assert 20 in result
     assert 10 not in result
@@ -208,7 +208,7 @@ def test_find_potentially_deleted_offers_empty_when_all_present():
     fetched = [ListingBasic(listing_id=11111111, area=55.0, price=400000, price_per_m=7000,
                             link="https://www.otodom.pl/pl/oferta/example-ID11111111")]
 
-    result = find_potentially_deleted_offers(fetched, "katowice", cur)
+    result = find_potentially_deleted_offers(fetched, {"katowice"}, cur)
 
     assert len(result) == 0
 

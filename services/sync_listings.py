@@ -39,13 +39,17 @@ def _scrape_offer(offer: ListingBasic, parser=download_data_from_listing_page,
                 return None
 
 
-def _find_closed_offers(fetched_offers: list, city: str, repository=repo,
+def _find_closed_offers(fetched_offers: list, repository=repo,
                         status_fetcher=get_offer_status) -> set:
     try:
-        # short-lived connection only for the two SELECTs; released before the long HTTP loop
+        # short-lived connection only for the SELECTs; released before the long HTTP loop
         conn, cur = get_fresh_connection()
         try:
-            potentially_deleted = repository.find_potentially_deleted_offers(fetched_offers, city, cur)
+            # scope = cities actually seen in this run (single-city job -> just that
+            # city; city+radius job -> that city plus surrounding towns Otodom returned)
+            scope_cities = repository.get_scope_cities(fetched_offers, cur)
+            logging.info(f"deleted-check scope covers {len(scope_cities)} cities: {sorted(scope_cities)}")
+            potentially_deleted = repository.find_potentially_deleted_offers(fetched_offers, scope_cities, cur)
             potentially_deleted_links = repository.find_offer_links(potentially_deleted, cur)
         finally:
             cur.close()
@@ -144,7 +148,7 @@ def sync(url: str, city: str, property_type: str = "apartment"):
 
         # HTTP-only phase — no DB connection held during the ~minutes-long status check loop
         logging.info("checking for deleted offers...")
-        deleted_offers = _find_closed_offers(all_offers_basic, city, repository, status_fetcher)
+        deleted_offers = _find_closed_offers(all_offers_basic, repository, status_fetcher)
 
         if deleted_offers:
             # fresh connection just for the UPDATEs; the previous one would have been idle-killed by the DB

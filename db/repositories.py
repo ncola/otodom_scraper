@@ -287,15 +287,32 @@ def check_if_price_changed(offer: ListingBasic, cur) -> tuple:
         return None, False, False
 
 
-def find_potentially_deleted_offers(fetched_offers: list[ListingBasic], city: str, cur) -> set:
+def get_scope_cities(fetched_offers: list[ListingBasic], cur) -> set[str]:
+    """Return distinct cities of listings from this run — used as the scope
+    for the deleted-offer check. Only listings we've seen (either freshly
+    inserted or already in DB) contribute, so the scope naturally matches
+    whatever the current search URL covers (single city, city+radius, etc.)."""
+    ids = [o.listing_id for o in fetched_offers]
+    if not ids:
+        return set()
+    cur.execute("""
+        SELECT DISTINCT l.city
+        FROM apartments_sale_listings asl
+        JOIN locations l ON asl.location_id = l.id
+        WHERE asl.otodom_listing_id = ANY(%s)
+    """, (ids,))
+    return {row[0] for row in cur.fetchall() if row[0]}
+
+
+def find_potentially_deleted_offers(fetched_offers: list[ListingBasic], cities: set[str], cur) -> set:
     all_offers_from_db_query = """
         SELECT asl.id, asl.otodom_listing_id, asl.area
         FROM apartments_sale_listings asl
         JOIN locations l ON asl.location_id = l.id
         WHERE asl.active IS TRUE
-        AND l.city = %s
+        AND l.city = ANY(%s)
         ;"""
-    cur.execute(all_offers_from_db_query, (city.lower(),))
+    cur.execute(all_offers_from_db_query, ([c.lower() for c in cities],))
     all_offers_from_db = cur.fetchall()
 
     ids_from_otodom = {offer.listing_id for offer in fetched_offers}
