@@ -1,19 +1,8 @@
-name: Hourly Otodom latest scraper
+name: Daily Otodom full scraper (apartments)
 
 on:
   schedule:
-    # Night (0-5 UTC): <0.5% of listings - once at 2 AM is enough
-    - cron: "0 2 * * *"
-
-    # Morning (6-8 UTC): 0.8-4.4% of listings per hour - every hour
-    - cron: "0 6,7,8 * * *"
-
-    # Peak hours (9-16 UTC): 8.2-16.7% of listings per hour - every 30 minutes
-    - cron: "0,30 9-16 * * *"
-
-    # Evening (17-23 UTC): <2.6% of listings per hour - every 2 hours
-    - cron: "0 18,20,22 * * *"
-
+    - cron: "0 3 * * *"
   workflow_dispatch:
     inputs:
       city:
@@ -42,17 +31,15 @@ jobs:
           DB_USER=${{ secrets.DB_USER }}
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           DB_SSLMODE=${{ secrets.DB_SSLMODE }}
-          SCRAPE_MODE=latest
-          LATEST_MAX_PAGES=2
           CITY=${{ matrix.city }}
           EOF
 
       - name: Run scraper
-        run: docker compose -f docker-compose.github.yml up --build --abort-on-container-exit scraper_latest
+        run: docker compose -f docker-compose.github.yml up --build --abort-on-container-exit scraper_full
 
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scraper-latest-logs-${{ matrix.city }}
+          name: scraper-logs-${{ matrix.city }}
           path: logs/

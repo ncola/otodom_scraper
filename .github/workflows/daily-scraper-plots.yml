@@ -1,0 +1,46 @@
+name: Daily Otodom full scraper (plots)
+
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+    inputs:
+      city:
+        description: "Ad-hoc single city (leave empty to run the scheduled matrix)"
+        required: false
+        default: ""
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        city: ${{ fromJSON(inputs.city && format('["{0}"]', inputs.city) || '["bielsko-biala"]') }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create .env
+        run: |
+          cat > .env <<EOF
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_SSLMODE=${{ secrets.DB_SSLMODE }}
+          CITY=${{ matrix.city }}
+          PROPERTY_TYPE=plot
+          DISTANCE_RADIUS=25
+          EOF
+
+      - name: Run scraper
+        run: docker compose -f docker-compose.github.yml up --build --abort-on-container-exit scraper_full
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraper-plots-logs-${{ matrix.city }}
+          path: logs/

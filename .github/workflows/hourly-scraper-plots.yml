@@ -1,0 +1,55 @@
+name: Hourly Otodom latest scraper (plots)
+
+on:
+  schedule:
+    # Plots have much lower listing turnover than apartments — a lighter
+    # cadence is enough: once at night, hourly in the morning, every 2h during
+    # the day, sparse in the evening.
+    - cron: "30 2 * * *"
+    - cron: "30 6,7,8 * * *"
+    - cron: "30 10,12,14,16 * * *"
+    - cron: "30 18,20,22 * * *"
+
+  workflow_dispatch:
+    inputs:
+      city:
+        description: "Ad-hoc single city (leave empty to run the scheduled matrix)"
+        required: false
+        default: ""
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        city: ${{ fromJSON(inputs.city && format('["{0}"]', inputs.city) || '["bielsko-biala"]') }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create .env
+        run: |
+          cat > .env <<EOF
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_SSLMODE=${{ secrets.DB_SSLMODE }}
+          SCRAPE_MODE=latest
+          LATEST_MAX_PAGES=2
+          CITY=${{ matrix.city }}
+          PROPERTY_TYPE=plot
+          DISTANCE_RADIUS=25
+          EOF
+
+      - name: Run scraper
+        run: docker compose -f docker-compose.github.yml up --build --abort-on-container-exit scraper_latest
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraper-plots-latest-logs-${{ matrix.city }}
+          path: logs/
